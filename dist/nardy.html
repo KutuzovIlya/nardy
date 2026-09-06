@@ -1,0 +1,3508 @@
+<title>Длинные нарды</title>
+<meta name="description" content="Длинные нарды: партия против компьютера или вдвоём за одним экраном.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Forum&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ============================================================
+   Нарды — оформление
+   Палитра: ореховая доска с латунной инкрустацией на тёмном
+   столе. Акцент — латунь, всё остальное приглушено.
+   ============================================================ */
+
+:root {
+  --bg:        #EFE8DA;
+  --bg-deep:   #E0D5C0;
+  --panel:     #FAF6EE;
+  --panel-2:   #F2EADA;
+  --line:      rgba(74, 56, 32, .18);
+  --line-soft: rgba(74, 56, 32, .10);
+  --text:      #2B2318;
+  --text-dim:  #6E6050;
+  --brass:     #8A6716;
+  --brass-lit: #B08A2E;
+  --felt:      #14514A;
+  --oxblood:   #7B2E26;
+  --shadow-lg: 0 30px 70px -30px rgba(40, 28, 12, .45);
+  --shadow-sm: 0 2px 10px rgba(40, 28, 12, .14);
+  --radius:    14px;
+  --move-dur:  380ms;
+  --ease:      cubic-bezier(.22, .68, .36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #10131A;
+    --bg-deep:   #070910;
+    --panel:     #181C25;
+    --panel-2:   #1F242F;
+    --line:      rgba(200, 162, 74, .18);
+    --line-soft: rgba(200, 162, 74, .09);
+    --text:      #EBE3D3;
+    --text-dim:  #968D7C;
+    --brass:     #C8A24A;
+    --brass-lit: #E5C97F;
+    --shadow-lg: 0 40px 90px -35px rgba(0, 0, 0, .9);
+    --shadow-sm: 0 2px 12px rgba(0, 0, 0, .5);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg:        #10131A;
+  --bg-deep:   #070910;
+  --panel:     #181C25;
+  --panel-2:   #1F242F;
+  --line:      rgba(200, 162, 74, .18);
+  --line-soft: rgba(200, 162, 74, .09);
+  --text:      #EBE3D3;
+  --text-dim:  #968D7C;
+  --brass:     #C8A24A;
+  --brass-lit: #E5C97F;
+  --shadow-lg: 0 40px 90px -35px rgba(0, 0, 0, .9);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, .5);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--bg);
+  background-image: radial-gradient(120% 90% at 50% -10%, var(--bg) 0%, var(--bg-deep) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; }
+
+/* ---------- каркас ---------- */
+
+.app {
+  min-height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---------- верхняя планка ---------- */
+
+.rail {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mark {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: Forum, Georgia, serif;
+  font-size: 30px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--text);
+}
+
+.mark em {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.tally {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.tally b {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.tally span {
+  font-size: 10px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.chip {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px !important;
+  letter-spacing: .12em !important;
+  text-transform: uppercase;
+  color: var(--brass) !important;
+  white-space: nowrap;
+}
+
+.rail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.btn .tight { display: none; }
+
+/* ---------- кнопки ---------- */
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 8px 15px;
+  font-size: 13px;
+  letter-spacing: .02em;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, transform .18s, color .18s;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) { border-color: var(--brass); color: var(--brass-lit); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .38; cursor: default; }
+.btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.btn-icon { padding: 8px 11px; }
+
+.btn-key {
+  background: linear-gradient(180deg, var(--brass-lit), var(--brass));
+  border-color: transparent;
+  color: #14100A;
+  font-weight: 500;
+}
+
+.btn-key:hover:not(:disabled) { color: #14100A; filter: brightness(1.08); }
+
+/* ---------- доска ---------- */
+
+.table { position: relative; }
+
+.stage { position: relative; }
+
+.board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1240 / 820;
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  touch-action: manipulation;
+}
+
+.board canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  display: block;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.layer.hit { pointer-events: auto; }
+
+/* пункты — прозрачные зоны нажатия */
+.zone {
+  position: absolute;
+  cursor: default;
+  border-radius: 4px;
+}
+
+.zone.live {
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* доступный пункт слегка светится у основания */
+.zone.live::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(200, 162, 74, .30), transparent 70%);
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.zone.live[data-row="top"]::after { top: -4%; }
+.zone.live[data-row="bottom"]::after { bottom: -4%; }
+.zone.live:hover::after { opacity: 1; }
+
+.spot { touch-action: none; }
+
+.zone.tray::after { display: none; }
+
+.zone.tray.live {
+  box-shadow: inset 0 0 0 2px rgba(200, 162, 74, .45), inset 0 0 26px rgba(200, 162, 74, .25);
+  border-radius: 9px;
+}
+
+/* ---------- шашки ---------- */
+
+.man {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--cd);
+  height: var(--cd);
+  border-radius: 50%;
+  will-change: transform;
+  transition: transform var(--move-dur) var(--ease), filter .2s ease;
+  z-index: 1;
+}
+
+.man::after {
+  content: "";
+  position: absolute;
+  inset: 21%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, .28), rgba(0, 0, 0, .12) 70%);
+}
+
+.man.w {
+  background:
+    radial-gradient(circle at 34% 27%, #FFFAEE 0%, #EDDFC0 38%, #D3BE95 72%, #A78F63 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 253, 245, .55),
+    inset 0 -7px 14px rgba(122, 96, 55, .38),
+    0 7px 16px -4px rgba(0, 0, 0, .62);
+}
+
+.man.w::after { box-shadow: inset 0 0 0 1.5px rgba(140, 112, 66, .35); }
+
+.man.b {
+  background:
+    radial-gradient(circle at 34% 27%, #5A5045 0%, #3A312A 38%, #211B17 72%, #0D0A08 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(200, 162, 74, .30),
+    inset 0 -7px 14px rgba(0, 0, 0, .55),
+    0 6px 14px -4px rgba(0, 0, 0, .65);
+}
+
+.man.b::after { box-shadow: inset 0 0 0 1.5px rgba(200, 162, 74, .22); }
+
+.man.pick { filter: brightness(1.1); z-index: 6; }
+
+.man.pick::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--brass);
+  box-shadow: 0 0 18px rgba(200, 162, 74, .55);
+}
+
+.man.hint::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px dashed var(--brass-lit);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+.man.land { animation: land .34s var(--ease); }
+
+@keyframes land {
+  0%   { filter: brightness(1.4); }
+  100% { filter: brightness(1); }
+}
+
+/* счётчик на высокой стопке */
+.tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--cd);
+  text-align: center;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: calc(var(--cd) * .34);
+  line-height: 1;
+  font-weight: 500;
+  color: #4B3517;
+  text-shadow: 0 1px 2px rgba(255, 250, 235, .55);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.tag.on-dark {
+  color: #F1E3BE;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+/* ---------- метки возможных ходов ---------- */
+
+.spot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--cd);
+  height: var(--cd);
+  border-radius: 50%;
+  border: 2px solid var(--brass);
+  background: radial-gradient(circle, rgba(200, 162, 74, .22), rgba(200, 162, 74, .04) 70%);
+  box-shadow: 0 0 22px rgba(200, 162, 74, .35);
+  animation: breathe 1.6s ease-in-out infinite;
+  z-index: 4;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.spot em {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-style: normal;
+  font-size: calc(var(--cd) * .38);
+  color: var(--brass-lit);
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: .55; }
+  50%      { opacity: 1; }
+}
+
+/* ---------- кости ---------- */
+
+.die-wrap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--dd);
+  height: var(--dd);
+  z-index: 3;
+}
+
+.die {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--dd) * .22);
+  background: linear-gradient(155deg, #FDF6E6 0%, #EADCBD 55%, #CBB68C 100%);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, .9),
+    inset 0 -4px 8px rgba(120, 96, 56, .35),
+    0 10px 20px -8px rgba(0, 0, 0, .7);
+  transition: opacity .3s, transform .3s;
+}
+
+.die.dark {
+  background: linear-gradient(155deg, #4C4239 0%, #2B241E 55%, #14100D 100%);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, .16),
+    inset 0 -4px 8px rgba(0, 0, 0, .6),
+    0 10px 20px -8px rgba(0, 0, 0, .8);
+}
+
+.die i {
+  position: absolute;
+  width: 17%;
+  height: 17%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6A5B45, #2A2119);
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, .5);
+}
+
+.die.dark i { background: radial-gradient(circle at 35% 30%, #E8D9B4, #B49A63); }
+
+.die.used { opacity: .45; transform: scale(.88); filter: saturate(.6); }
+
+.die.tumble { animation: tumble .58s var(--ease); }
+
+@keyframes tumble {
+  0%   { transform: translateY(-34px) rotate(-160deg) scale(.7); opacity: 0; }
+  55%  { transform: translateY(6px) rotate(14deg) scale(1.06); opacity: 1; }
+  75%  { transform: translateY(-4px) rotate(-4deg) scale(.99); }
+  100% { transform: translateY(0) rotate(0) scale(1); }
+}
+
+/* ---------- сообщение над доской ---------- */
+
+.quip {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  transform: translate(-50%, 8px);
+  max-width: min(88%, 34rem);
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: rgba(12, 9, 6, .8);
+  border: 1px solid rgba(200, 162, 74, .34);
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
+  font-family: Forum, Georgia, serif;
+  font-size: clamp(15px, 2.2vw, 21px);
+  letter-spacing: .02em;
+  color: #F2E4C2;
+  text-align: center;
+  text-wrap: balance;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .28s, transform .28s var(--ease);
+  z-index: 21;
+}
+
+.quip.show { opacity: 1; transform: translate(-50%, 0); }
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  transform: translate(-50%, 10px);
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(10, 8, 6, .84);
+  border: 1px solid rgba(200, 162, 74, .38);
+  color: #F0E6D2;
+  font-size: 13px;
+  letter-spacing: .02em;
+  max-width: min(92%, 30rem);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  z-index: 20;
+  backdrop-filter: blur(6px);
+}
+
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- нижние панели ---------- */
+
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.plaque {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+  transition: border-color .3s, background .3s;
+}
+
+.plaque::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--brass), transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .5s var(--ease);
+}
+
+.plaque.act { border-color: color-mix(in srgb, var(--brass) 55%, transparent); background: var(--panel-2); }
+.plaque.act::before { transform: scaleX(1); }
+
+.disc {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.disc.w { background: radial-gradient(circle at 34% 28%, #FFFAEE, #E0D0AE 60%, #AC9469); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .5), 0 2px 6px rgba(0, 0, 0, .35); }
+.disc.b { background: radial-gradient(circle at 34% 28%, #574D42, #241E19 60%, #100C09); box-shadow: inset 0 0 0 1.5px rgba(200, 162, 74, .3), 0 2px 6px rgba(0, 0, 0, .45); }
+
+.pname {
+  font-family: Forum, Georgia, serif;
+  font-size: 19px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.pmeta {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: .04em;
+}
+
+.pstats {
+  margin-left: auto;
+  display: flex;
+  gap: 14px;
+  text-align: right;
+}
+
+.pstats div { display: flex; flex-direction: column; }
+
+.pstats b {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.pstats span {
+  font-size: 9px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* журнал ходов */
+
+.log {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px 4px 10px 14px;
+  min-height: 84px;
+}
+
+.log h2 {
+  margin: 0 0 6px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: .26em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.log ol {
+  margin: 0;
+  padding: 0 10px 0 0;
+  list-style: none;
+  max-height: 102px;
+  overflow-y: auto;
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 3px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.log li { display: flex; gap: 8px; }
+.log li b { font-weight: 500; color: var(--text); min-width: 52px; }
+.log li.w b { color: var(--text); }
+.log li.b b { color: var(--brass); }
+
+/* ---------- модальное окно ---------- */
+
+.veil {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg-deep) 78%, transparent);
+  backdrop-filter: blur(10px) saturate(.9);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s;
+}
+
+.veil.show { opacity: 1; pointer-events: auto; }
+
+.sheet {
+  width: min(480px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  padding: 26px 28px 24px;
+  transform: translateY(12px) scale(.98);
+  transition: transform .35s var(--ease);
+}
+
+.veil.show .sheet { transform: none; }
+
+.sheet h1 {
+  margin: 0 0 4px;
+  font-family: Forum, Georgia, serif;
+  font-size: 34px;
+  font-weight: 400;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.sheet .lede {
+  margin: 0 0 22px;
+  color: var(--text-dim);
+  font-size: 13px;
+  max-width: 46ch;
+}
+
+.field { margin-bottom: 18px; }
+
+.field > label {
+  display: block;
+  margin-bottom: 7px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: .26em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+}
+
+.seg button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background .2s, color .2s;
+}
+
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] {
+  background: linear-gradient(180deg, var(--brass-lit), var(--brass));
+  color: #14100A;
+}
+.seg button:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  min-height: 1em;
+}
+
+.field.gap { margin-top: 24px; }
+
+.inp {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.inp::placeholder { color: var(--text-dim); }
+.inp:focus { outline: 2px solid var(--brass); outline-offset: 1px; border-color: transparent; }
+
+.inp.mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.row { display: flex; gap: 8px; }
+.row .inp { flex: 1; min-width: 0; }
+.row .btn { flex: none; }
+
+.code-big {
+  margin: 4px 0 2px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 40px;
+  letter-spacing: .28em;
+  text-align: center;
+  text-indent: .28em;
+  color: var(--brass-lit);
+}
+
+.tables {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.tables li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  font-size: 13px;
+}
+
+.tables li.muted {
+  color: var(--text-dim);
+  border-style: dashed;
+  background: transparent;
+}
+
+.tables b {
+  font-weight: 500;
+  letter-spacing: .16em;
+  color: var(--brass-lit);
+}
+
+.tables span { color: var(--text-dim); margin-right: auto; }
+.tables .btn { padding: 6px 13px; font-size: 12px; }
+
+.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+.sheet-actions { display: flex; gap: 10px; margin-top: 22px; }
+.sheet-actions .btn { flex: 1; text-align: center; padding: 11px 16px; }
+
+.rules { font-size: 13.5px; color: var(--text-dim); }
+.rules h3 {
+  margin: 18px 0 5px;
+  font-family: Forum, Georgia, serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.rules p { margin: 0 0 8px; max-width: 62ch; }
+.rules b { color: var(--text); font-weight: 500; }
+
+.crown {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
+
+.crown .disc { width: 40px; height: 40px; }
+
+/* ---------- адаптив ---------- */
+
+@media (max-width: 860px) {
+  .app { padding: 12px 12px 28px; gap: 12px; }
+  .mark { font-size: 22px; }
+  .mark em { display: none; }
+  .panels { grid-template-columns: 1fr; }
+  .log { order: 3; }
+  .rail { flex-wrap: wrap; gap: 10px; }
+  .tally { order: 3; margin-left: 0; }
+  .rail-actions { margin-left: auto; }
+  .btn { padding: 7px 12px; font-size: 12px; }
+}
+
+@media (max-width: 560px) {
+  .btn .wide { display: none; }
+  .btn .tight { display: inline; }
+  .btn { padding: 7px 11px; }
+  .sheet { padding: 20px 18px; }
+  .sheet h1 { font-size: 27px; }
+}
+
+/* Телефон в портрете: доска разворачивается на 90°, шашки становятся
+   в полтора раза крупнее — иначе играть пальцем невозможно. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .stage {
+    width: 100%;
+    aspect-ratio: 820 / 1240;
+    overflow: hidden;
+  }
+  .stage .board {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 151.22%;
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+  .log ol { max-height: 58px; }
+  .panels { gap: 8px; }
+  .plaque { padding: 10px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  .man { transition-duration: .01ms; }
+}
+</style>
+<div class="app">
+
+  <header class="rail">
+    <div class="mark">Нарды <em>длинные</em></div>
+
+    <div class="tally">
+      <span class="chip" id="net-chip" hidden></span>
+      <span>счёт</span>
+      <b id="tally-w">0</b>
+      <span>:</span>
+      <b id="tally-b">0</b>
+    </div>
+
+    <nav class="rail-actions">
+      <button class="btn" id="act-hint" type="button" title="Показать сильный ход"><span class="wide">Подсказка</span><span class="tight">Совет</span></button>
+      <button class="btn" id="act-undo" type="button" title="Вернуть последнюю шашку"><span class="wide">Отменить</span><span class="tight">Назад</span></button>
+      <button class="btn" id="act-rules" type="button">Правила</button>
+      <button class="btn btn-icon" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
+      <button class="btn btn-key" id="act-new" type="button"><span class="wide">Новая партия</span><span class="tight">Новая</span></button>
+    </nav>
+  </header>
+
+  <main class="table">
+   <div class="stage" id="stage">
+    <div class="board" id="board">
+      <canvas id="scene"></canvas>
+      <div class="layer hit" id="zones"></div>
+      <div class="layer" id="men"></div>
+      <div class="layer" id="spots"></div>
+      <div class="layer" id="dice"></div>
+    </div>
+    <div class="quip" id="quip"></div>
+    <div class="toast" id="toast"></div>
+   </div>
+  </main>
+
+  <section class="panels">
+    <div class="plaque" id="pl-w">
+      <span class="disc w"></span>
+      <div>
+        <div class="pname">Белые</div>
+        <div class="pmeta" id="meta-w">Игрок</div>
+      </div>
+      <div class="pstats">
+        <div><b id="pip-w">360</b><span>пипсы</span></div>
+        <div><b id="off-w">0</b><span>снято</span></div>
+      </div>
+    </div>
+
+    <div class="log">
+      <h2>Ход за ходом</h2>
+      <ol id="log"></ol>
+    </div>
+
+    <div class="plaque" id="pl-b">
+      <span class="disc b"></span>
+      <div>
+        <div class="pname">Чёрные</div>
+        <div class="pmeta" id="meta-b">Компьютер</div>
+      </div>
+      <div class="pstats">
+        <div><b id="pip-b">360</b><span>пипсы</span></div>
+        <div><b id="off-b">0</b><span>снято</span></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="veil" id="veil">
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Меню"></div>
+</div>
+<script>
+/* ============================================================
+   Длинные нарды — движок правил
+   Кольцо из 24 пунктов. Оба игрока идут в сторону возрастания
+   индекса. Голова белых — пункт 0, голова чёрных — пункт 12.
+   Дом белых — 18..23, дом чёрных — 6..11.
+   В points[] белые хранятся положительным числом, чёрные —
+   отрицательным.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var WHITE = 'w', BLACK = 'b', OFF = -1, NP = 24, NC = 15;
+  var HEAD = { w: 0, b: 12 };
+
+  function opp(p) { return p === WHITE ? BLACK : WHITE; }
+  function rel(p, i) { return (i - HEAD[p] + NP) % NP; }
+  function absOf(p, r) { return (HEAD[p] + r) % NP; }
+  function cnt(st, i, p) { var v = st.points[i]; return p === WHITE ? (v > 0 ? v : 0) : (v < 0 ? -v : 0); }
+  function ownerOf(v) { return v > 0 ? WHITE : (v < 0 ? BLACK : null); }
+  /* Номер пункта глазами игрока: голова — 24, последний перед выходом — 1 */
+  function label(p, i) { return i === OFF ? 'вне' : String(NP - rel(p, i)); }
+
+  function create() {
+    var pts = [], i;
+    for (i = 0; i < NP; i++) pts.push(0);
+    pts[HEAD.w] = NC;
+    pts[HEAD.b] = -NC;
+    return {
+      points: pts,
+      off: { w: 0, b: 0 },
+      turn: WHITE,
+      roll: [],
+      dice: [],
+      headUsed: 0,
+      turnNo: { w: 0, b: 0 },
+      moves: [],
+      winner: null
+    };
+  }
+
+  function clone(st) {
+    return {
+      points: st.points.slice(),
+      off: { w: st.off.w, b: st.off.b },
+      turn: st.turn,
+      roll: st.roll.slice(),
+      dice: st.dice.slice(),
+      headUsed: st.headUsed,
+      turnNo: { w: st.turnNo.w, b: st.turnNo.b },
+      moves: st.moves.slice(),
+      winner: st.winner
+    };
+  }
+
+  function setRoll(st, d1, d2) {
+    st.roll = [d1, d2];
+    st.dice = (d1 === d2) ? [d1, d1, d1, d1] : [d1, d2];
+    st.headUsed = 0;
+    st.moves = [];
+    return st;
+  }
+
+  function endTurn(st) {
+    st.turnNo[st.turn]++;
+    st.turn = opp(st.turn);
+    st.roll = [];
+    st.dice = [];
+    st.headUsed = 0;
+    st.moves = [];
+    return st;
+  }
+
+  /* Со скольких шашек можно снять с головы за этот ход.
+     Первый ход игрока при дубле 3-3, 4-4, 6-6 — две шашки. */
+  function headLimit(st, p) {
+    if (st.turnNo[p] === 0 && st.roll.length === 2 && st.roll[0] === st.roll[1] &&
+        (st.roll[0] === 3 || st.roll[0] === 4 || st.roll[0] === 6)) return 2;
+    return 1;
+  }
+
+  function allHome(st, p) {
+    for (var i = 0; i < NP; i++) {
+      if (cnt(st, i, p) > 0 && rel(p, i) < 18) return false;
+    }
+    return true;
+  }
+
+  /* Самая дальняя от выхода своя шашка (минимальный rel) */
+  function tailRel(st, p) {
+    var m = 99;
+    for (var i = 0; i < NP; i++) {
+      if (cnt(st, i, p) > 0) { var r = rel(p, i); if (r < m) m = r; }
+    }
+    return m;
+  }
+
+  function pips(st, p) {
+    var s = 0;
+    for (var i = 0; i < NP; i++) {
+      var c = cnt(st, i, p);
+      if (c) s += (NP - rel(p, i)) * c;
+    }
+    return s;
+  }
+
+  /* Правило шести: нельзя запереть все 15 шашек соперника
+     непрерывным блоком из шести своих пунктов. */
+  function blockLegal(st, p) {
+    var q = opp(p), start, k, j, ok, front, ahead, r;
+    /* если все шашки соперника уже в его доме — блок ему не мешает выйти */
+    var allQHome = true;
+    for (j = 0; j < NP; j++) if (cnt(st, j, q) > 0 && rel(q, j) < 18) { allQHome = false; break; }
+    if (allQHome || st.off[q] > 0) return true;
+
+    for (start = 0; start < NP; start++) {
+      ok = true;
+      for (k = 0; k < 6; k++) {
+        if (cnt(st, (start + k) % NP, p) === 0) { ok = false; break; }
+      }
+      if (!ok) continue;
+      front = -1;
+      for (k = 0; k < 6; k++) {
+        r = rel(q, (start + k) % NP);
+        if (r > front) front = r;
+      }
+      ahead = false;
+      for (j = 0; j < NP; j++) {
+        if (cnt(st, j, q) > 0 && rel(q, j) > front) { ahead = true; break; }
+      }
+      if (!ahead) return false;
+    }
+    return true;
+  }
+
+  function applyTo(st, mv) {
+    var p = st.turn, sgn = (p === WHITE ? 1 : -1);
+    st.points[mv.from] -= sgn;
+    if (mv.to === OFF) st.off[p]++;
+    else st.points[mv.to] += sgn;
+    if (mv.from === HEAD[p]) st.headUsed++;
+    var k = st.dice.indexOf(mv.die);
+    if (k >= 0) st.dice.splice(k, 1);
+    st.moves.push(mv);
+    if (st.off[p] === NC) st.winner = p;
+    return st;
+  }
+
+  /* Все ходы, законные по «локальным» правилам: занятость пункта,
+     голова, снятие с поля, правило шести. Без учёта обязательного
+     использования максимума костей. */
+  function rawMoves(st) {
+    var p = st.turn, res = [], used = {}, i, d, di, c, r, nr, to, mv, ns;
+    if (st.winner || !st.dice.length) return res;
+    var hl = headLimit(st, p);
+    var home = allHome(st, p);
+    var tail = home ? tailRel(st, p) : -1;
+    var seenDie = {};
+    for (di = 0; di < st.dice.length; di++) {
+      d = st.dice[di];
+      if (seenDie[d]) continue;
+      seenDie[d] = 1;
+      for (i = 0; i < NP; i++) {
+        c = cnt(st, i, p);
+        if (!c) continue;
+        if (i === HEAD[p] && st.headUsed >= hl) continue;
+        r = rel(p, i);
+        nr = r + d;
+        if (nr < NP) {
+          to = absOf(p, nr);
+          if (ownerOf(st.points[to]) === opp(p)) continue;
+          mv = { from: i, to: to, die: d };
+        } else {
+          if (!home) continue;
+          /* точный бросок — всегда можно; больший — только с самой дальней шашки */
+          if (nr > NP && r !== tail) continue;
+          mv = { from: i, to: OFF, die: d };
+        }
+        ns = clone(st);
+        applyTo(ns, mv);
+        if (!blockLegal(ns, p)) continue;
+        res.push(mv);
+      }
+    }
+    return res;
+  }
+
+  function stKey(st) {
+    return st.points.join(',') + '|' + st.dice.slice().sort().join('') + '|' + st.headUsed;
+  }
+
+  /* Максимальное число костей, которое ещё можно разыграть */
+  function maxDepth(st, memo) {
+    if (!st.dice.length || st.winner) return 0;
+    var k = stKey(st);
+    if (memo[k] !== undefined) return memo[k];
+    memo[k] = 0;
+    var mv = rawMoves(st), best = 0, i, ns, d;
+    for (i = 0; i < mv.length; i++) {
+      ns = clone(st);
+      applyTo(ns, mv[i]);
+      d = 1 + maxDepth(ns, memo);
+      if (d > best) best = d;
+      if (best === st.dice.length) break;
+    }
+    memo[k] = best;
+    return best;
+  }
+
+  /* Законные ходы с учётом обязанности разыграть максимум костей
+     и старшую кость, если играется только одна. */
+  function legalMoves(st, memo) {
+    memo = memo || {};
+    var raw = rawMoves(st);
+    if (!raw.length) return raw;
+    var depths = [], best = 0, i, ns, d;
+    for (i = 0; i < raw.length; i++) {
+      ns = clone(st);
+      applyTo(ns, raw[i]);
+      d = 1 + maxDepth(ns, memo);
+      depths.push(d);
+      if (d > best) best = d;
+    }
+    var res = [];
+    for (i = 0; i < raw.length; i++) if (depths[i] === best) res.push(raw[i]);
+    if (best === 1 && st.dice.length === 2 && st.dice[0] !== st.dice[1]) {
+      var big = Math.max(st.dice[0], st.dice[1]), f = [];
+      for (i = 0; i < res.length; i++) if (res[i].die === big) f.push(res[i]);
+      if (f.length) res = f;
+    }
+    return res;
+  }
+
+  /* Все возможные полные ходы (последовательности), без повторов позиции */
+  function sequences(st, cap) {
+    var memo = {}, out = [], seen = {}, nodes = 0;
+    cap = cap || 60000;
+    function dfs(s, path) {
+      if (nodes++ > cap) return;
+      var mv = s.winner ? [] : legalMoves(s, memo);
+      if (!mv.length) {
+        var k = s.points.join(',') + '|' + s.off.w + '|' + s.off.b;
+        if (!seen[k]) { seen[k] = 1; out.push({ state: s, path: path }); }
+        return;
+      }
+      for (var i = 0; i < mv.length; i++) {
+        var ns = clone(s);
+        applyTo(ns, mv[i]);
+        dfs(ns, path.concat([mv[i]]));
+      }
+    }
+    dfs(clone(st), []);
+    return out;
+  }
+
+  function rollDie() { return 1 + Math.floor(Math.random() * 6); }
+
+  global.Nardy = {
+    WHITE: WHITE, BLACK: BLACK, OFF: OFF, NP: NP, NC: NC, HEAD: HEAD,
+    opp: opp, rel: rel, absOf: absOf, cnt: cnt, ownerOf: ownerOf, label: label,
+    create: create, clone: clone, setRoll: setRoll, endTurn: endTurn,
+    headLimit: headLimit, allHome: allHome, pips: pips, blockLegal: blockLegal,
+    applyTo: applyTo, rawMoves: rawMoves, legalMoves: legalMoves,
+    maxDepth: maxDepth, sequences: sequences, rollDie: rollDie
+  };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Длинные нарды — оценка позиции и выбор хода компьютером
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var N = global.Nardy;
+  var NP = N.NP;
+
+  /* Оценка позиции глазами игрока p. Больше — лучше. */
+  function side(st, p) {
+    var i, c, r, progress = 0, head = 0, spots = 0, stack = 0, homeCnt = 0;
+    for (i = 0; i < NP; i++) {
+      c = N.cnt(st, i, p);
+      if (!c) continue;
+      r = N.rel(p, i);
+      progress += r * c;
+      spots++;
+      if (i === N.HEAD[p]) head = c;
+      if (r >= 18) homeCnt += c;
+      if (c > 4) stack += (c - 4);
+    }
+    var s = 0;
+    s += st.off[p] * 34;          /* снятая шашка дороже любого продвижения */
+    s += progress * 0.85;
+    s -= head * head * 0.30;      /* куча на голове — потерянные темпы */
+    s += spots * 2.2;             /* занятые пункты: пространство и выбор */
+    s -= stack * 1.4;             /* башни выше четырёх бесполезны */
+    s += homeCnt * 0.7;
+    s += blocks(st, p);
+    return s;
+  }
+
+  /* Непрерывные цепочки своих пунктов; ценнее, если запирают соперника */
+  function blocks(st, p) {
+    var q = N.opp(p), occ = [], k, total = 0;
+    for (k = 0; k < NP; k++) occ.push(N.cnt(st, N.absOf(p, k), p) > 0);
+    k = 0;
+    while (k < NP) {
+      if (!occ[k]) { k++; continue; }
+      var a = k;
+      while (k < NP && occ[k]) k++;
+      var len = k - a;
+      if (len < 2) continue;
+      var front = -1, m, r;
+      for (m = a; m < a + len; m++) {
+        r = N.rel(q, N.absOf(p, m));
+        if (r > front) front = r;
+      }
+      var behind = 0, j;
+      for (j = 0; j < NP; j++) {
+        var c = N.cnt(st, j, q);
+        if (c && N.rel(q, j) < front) behind += c;
+      }
+      total += len * len * (behind ? 0.85 : 0.2);
+      if (len >= 4) total += behind * 0.8;
+    }
+    return total;
+  }
+
+  function evaluate(st, p) {
+    return side(st, p) - side(st, N.opp(p)) * 0.92;
+  }
+
+  /* Быстрый «жадный» ответ соперника — для перебора на уровне «мастер» */
+  function greedyPlay(st) {
+    var s = N.clone(st), guard = 0;
+    while (s.dice.length && !s.winner && guard++ < 6) {
+      var mv = N.rawMoves(s);
+      if (!mv.length) break;
+      var best = null, bestV = -1e9, i, ns, v;
+      for (i = 0; i < mv.length; i++) {
+        ns = N.clone(s); N.applyTo(ns, mv[i]);
+        v = evaluate(ns, s.turn);
+        if (v > bestV) { bestV = v; best = mv[i]; }
+      }
+      N.applyTo(s, best);
+    }
+    return s;
+  }
+
+  var ROLLS = (function () {
+    var r = [], a, b;
+    for (a = 1; a <= 6; a++) for (b = a; b <= 6; b++) r.push([a, b, a === b ? 1 : 2]);
+    return r;
+  })();
+
+  /* Матожидание оценки после ответа соперника */
+  function afterReply(st, p, deadline) {
+    var total = 0, weight = 0, i;
+    for (i = 0; i < ROLLS.length; i++) {
+      if (Date.now() > deadline) break;
+      var s = N.clone(st);
+      N.endTurn(s);
+      N.setRoll(s, ROLLS[i][0], ROLLS[i][1]);
+      var after = greedyPlay(s);
+      total += evaluate(after, p) * ROLLS[i][2];
+      weight += ROLLS[i][2];
+    }
+    return weight ? total / weight : evaluate(st, p);
+  }
+
+  /* Выбор полного хода. level: 'easy' | 'normal' | 'hard' */
+  function choose(st, level) {
+    var seqs = N.sequences(st);
+    if (!seqs.length) return [];
+    var p = st.turn, i;
+    for (i = 0; i < seqs.length; i++) {
+      seqs[i].score = evaluate(seqs[i].state, p);
+    }
+
+    if (level === 'easy') {
+      for (i = 0; i < seqs.length; i++) seqs[i].score += (Math.random() - 0.5) * 55;
+      seqs.sort(byScore);
+      /* иногда новичок просто ошибается */
+      var pick = Math.random() < 0.22 ? Math.floor(Math.random() * seqs.length) : 0;
+      return seqs[pick].path;
+    }
+
+    seqs.sort(byScore);
+    if (level !== 'hard' || seqs.length === 1) return seqs[0].path;
+
+    var top = seqs.slice(0, Math.min(7, seqs.length));
+    var deadline = Date.now() + 900;
+    for (i = 0; i < top.length; i++) {
+      top[i].score = top[i].score * 0.25 + afterReply(top[i].state, p, deadline) * 0.75;
+    }
+    top.sort(byScore);
+    return top[0].path;
+  }
+
+  function byScore(a, b) { return b.score - a.score; }
+
+  global.NardyAI = { choose: choose, evaluate: evaluate };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Отрисовка доски: орех, латунная инкрустация, войлочные пункты.
+   Всё в «виртуальных» координатах 1240×820, canvas масштабирует.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var VW = 1240, VH = 820;
+  var FRAME = 26, TRAY = 96, GAP = 12;
+  var FX0 = FRAME + TRAY + GAP;
+  var FX1 = VW - FRAME - TRAY - GAP;
+  var BAR = 48;
+  var PTW = (FX1 - FX0 - BAR) / 12;
+  var FY0 = FRAME + 10, FY1 = VH - FRAME - 10;
+  var PTH = 316, CD = 66, DD = 62;
+
+  var C = {
+    frameHi: '#5A3722', frameLo: '#24140D',
+    bed: '#3E2517', bedLo: '#241209',
+    bone: '#D9C39B', boneMid: '#C2A97E', boneLo: '#9C8256',
+    felt: '#1D5A53', feltMid: '#154742', feltLo: '#0E332F',
+    brass: '#C8A24A', dark: '#2B1710'
+  };
+
+  function colX(j) { return FX0 + j * PTW + (j >= 6 ? BAR : 0); }
+
+  /* Геометрия пункта i: верхний ряд — 12..23 слева направо,
+     нижний — 11..0 слева направо. */
+  function geom(i) {
+    var top = i >= 12;
+    var j = top ? i - 12 : 11 - i;
+    return { j: j, top: top, x: colX(j), y: top ? FY0 : FY1 - PTH, w: PTW, h: PTH };
+  }
+
+  function gapFor(n) {
+    if (n <= 1) return 0;
+    return Math.max(15, Math.min(58, (PTH - CD) / (n - 1)));
+  }
+
+  /* Позиция k-й шашки в стопке из n на пункте i */
+  function manAt(i, k, n) {
+    var g = geom(i), sp = gapFor(n);
+    return {
+      x: g.x + (PTW - CD) / 2,
+      y: g.top ? FY0 + k * sp : FY1 - CD - k * sp
+    };
+  }
+
+  /* Позиция k-й снятой шашки в лотке */
+  function trayAt(player, k) {
+    var x = player === 'w' ? VW - FRAME - TRAY + (TRAY - CD) / 2 : FRAME + (TRAY - CD) / 2;
+    var y = player === 'w' ? FY0 + k * 30 : FY1 - CD - k * 30;
+    return { x: x, y: y };
+  }
+
+  /* Прямоугольник лотка для снятых шашек */
+  function trayBox(player) {
+    return {
+      x: player === 'w' ? VW - FRAME - TRAY + 3 : FRAME + 3,
+      y: FRAME + 8,
+      w: TRAY - 6,
+      h: VH - 2 * FRAME - 16
+    };
+  }
+
+  function diceAt(player, idx, n) {
+    var cx = player === 'w' ? FX0 + 9 * PTW + BAR : FX0 + 3 * PTW;
+    var total = n * DD + (n - 1) * 10;
+    return { x: cx - total / 2 + idx * (DD + 10), y: (FY0 + PTH + FY1 - PTH) / 2 - DD / 2 };
+  }
+
+  /* ---------- рисование ---------- */
+
+  function rnd32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function rrect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) { ctx.roundRect(x, y, w, h, r); return; }
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* Древесные волокна */
+  function grain(ctx, x, y, w, h, seed, lines, alpha) {
+    var r = rnd32(seed), i, xx, yy, amp, ph, per;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    for (i = 0; i < lines; i++) {
+      yy = y + r() * h;
+      amp = 1.5 + r() * 6;
+      ph = r() * 6.283;
+      per = 90 + r() * 300;
+      ctx.beginPath();
+      ctx.moveTo(x, yy);
+      for (xx = x; xx <= x + w; xx += 12) ctx.lineTo(xx, yy + Math.sin(xx / per + ph) * amp);
+      ctx.strokeStyle = r() > 0.45
+        ? 'rgba(255,218,168,' + (alpha * r() * 0.9).toFixed(3) + ')'
+        : 'rgba(24,12,4,' + (alpha * 1.7 * r()).toFixed(3) + ')';
+      ctx.lineWidth = 0.5 + r() * 1.7;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* Хатам: цепочка ромбов вдоль отрезка */
+  function inlayRun(ctx, x0, y0, x1, y1, offset) {
+    var len = Math.hypot(x1 - x0, y1 - y0), step = 21.5;
+    var n = Math.floor(len / step), i, t, x, y, k;
+    var pal = [C.bone, C.brass, C.dark, C.brass];
+    for (i = 0; i <= n; i++) {
+      t = (i * step) / len;
+      x = x0 + (x1 - x0) * t;
+      y = y0 + (y1 - y0) * t;
+      k = (i + offset) % pal.length;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = pal[k];
+      ctx.globalAlpha = k === 2 ? 0.85 : 0.92;
+      ctx.fillRect(-4.6, -4.6, 9.2, 9.2);
+      ctx.restore();
+    }
+  }
+
+  function drawFrame(ctx) {
+    var g = ctx.createLinearGradient(0, 0, VW * 0.6, VH);
+    g.addColorStop(0, C.frameHi);
+    g.addColorStop(0.45, '#3A2115');
+    g.addColorStop(1, C.frameLo);
+    rrect(ctx, 0, 0, VW, VH, 18);
+    ctx.fillStyle = g;
+    ctx.fill();
+    grain(ctx, 0, 0, VW, VH, 7, 190, 0.10);
+
+    var c = FRAME / 2;
+    inlayRun(ctx, c, c, VW - c, c, 0);
+    inlayRun(ctx, c, VH - c, VW - c, VH - c, 2);
+    inlayRun(ctx, c, c, c, VH - c, 1);
+    inlayRun(ctx, VW - c, c, VW - c, VH - c, 3);
+
+    ctx.strokeStyle = 'rgba(200,162,74,.55)';
+    ctx.lineWidth = 1.1;
+    rrect(ctx, 2.5, 2.5, VW - 5, VH - 5, 16); ctx.stroke();
+    rrect(ctx, FRAME - 2.5, FRAME - 2.5, VW - 2 * FRAME + 5, VH - 2 * FRAME + 5, 6); ctx.stroke();
+  }
+
+  function drawBed(ctx) {
+    var x = FRAME, y = FRAME, w = VW - 2 * FRAME, h = VH - 2 * FRAME;
+    var g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, C.bed);
+    g.addColorStop(0.5, '#341E12');
+    g.addColorStop(1, C.bedLo);
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    grain(ctx, x, y, w, h, 21, 150, 0.09);
+
+    /* тень от бортов */
+    var s = ctx.createLinearGradient(x, 0, x + 40, 0);
+    s.addColorStop(0, 'rgba(0,0,0,.55)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s; ctx.fillRect(x, y, 40, h);
+    s = ctx.createLinearGradient(x + w, 0, x + w - 40, 0);
+    s.addColorStop(0, 'rgba(0,0,0,.55)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s; ctx.fillRect(x + w - 40, y, 40, h);
+    s = ctx.createLinearGradient(0, y, 0, y + 30);
+    s.addColorStop(0, 'rgba(0,0,0,.5)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s; ctx.fillRect(x, y, w, 30);
+  }
+
+  function drawTray(ctx, side) {
+    var x = side === 'l' ? FRAME + 3 : VW - FRAME - TRAY + 3;
+    var y = FRAME + 8, w = TRAY - 6, h = VH - 2 * FRAME - 16;
+    rrect(ctx, x, y, w, h, 9);
+    ctx.fillStyle = '#1B0F08';
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    grain(ctx, x, y, w, h, side === 'l' ? 33 : 44, 40, 0.07);
+    var s = ctx.createLinearGradient(x, y, x + 22, y);
+    s.addColorStop(0, 'rgba(0,0,0,.75)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s; ctx.fillRect(x, y, 22, h);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(200,162,74,.32)';
+    ctx.lineWidth = 1;
+    rrect(ctx, x, y, w, h, 9); ctx.stroke();
+
+    /* гравировка «ДОМ» у дальнего края лотка */
+    ctx.save();
+    ctx.translate(x + w / 2, side === 'l' ? y + 40 : y + h - 40);
+    ctx.rotate(side === 'l' ? -Math.PI / 2 : Math.PI / 2);
+    ctx.fillStyle = 'rgba(200,162,74,.42)';
+    ctx.font = '500 15px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '5px';
+    ctx.fillText('ДОМ', 0, 0);
+    ctx.restore();
+  }
+
+  function drawBar(ctx) {
+    var x = FX0 + 6 * PTW, y = FRAME + 8, h = VH - 2 * FRAME - 16;
+    var g = ctx.createLinearGradient(x, 0, x + BAR, 0);
+    g.addColorStop(0, '#160C06');
+    g.addColorStop(0.5, '#4A2B1A');
+    g.addColorStop(1, '#160C06');
+    rrect(ctx, x, y, BAR, h, 7);
+    ctx.fillStyle = g; ctx.fill();
+    grain(ctx, x, y, BAR, h, 55, 26, 0.10);
+    ctx.strokeStyle = 'rgba(200,162,74,.30)';
+    ctx.lineWidth = 1;
+    rrect(ctx, x, y, BAR, h, 7); ctx.stroke();
+  }
+
+  function drawPoints(ctx) {
+    var i, g, light, baseY, apexY, grd;
+    for (i = 0; i < 24; i++) {
+      g = geom(i);
+      light = ((g.j + (g.top ? 0 : 1)) % 2) === 0;
+      baseY = g.top ? FY0 : FY1;
+      apexY = g.top ? FY0 + PTH : FY1 - PTH;
+      ctx.beginPath();
+      ctx.moveTo(g.x + 1.5, baseY);
+      ctx.lineTo(g.x + PTW - 1.5, baseY);
+      ctx.lineTo(g.x + PTW / 2, apexY);
+      ctx.closePath();
+      grd = ctx.createLinearGradient(0, baseY, 0, apexY);
+      if (light) {
+        grd.addColorStop(0, C.bone); grd.addColorStop(0.55, C.boneMid); grd.addColorStop(1, C.boneLo);
+      } else {
+        grd.addColorStop(0, C.felt); grd.addColorStop(0.55, C.feltMid); grd.addColorStop(1, C.feltLo);
+      }
+      ctx.fillStyle = grd;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200,162,74,.18)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    /* латунная нить вдоль домов */
+    ctx.strokeStyle = 'rgba(200,162,74,.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(colX(6), FY0 - 3); ctx.lineTo(colX(11) + PTW, FY0 - 3);
+    ctx.moveTo(colX(0), FY1 + 3); ctx.lineTo(colX(5) + PTW, FY1 + 3);
+    ctx.stroke();
+  }
+
+  function drawLight(ctx) {
+    var g = ctx.createLinearGradient(0, 0, VW * 0.75, VH);
+    g.addColorStop(0, 'rgba(255,240,214,.09)');
+    g.addColorStop(0.35, 'rgba(255,240,214,.02)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    rrect(ctx, 0, 0, VW, VH, 18);
+    ctx.fillStyle = g; ctx.fill();
+
+    var v = ctx.createRadialGradient(VW / 2, VH * 0.42, VH * 0.30, VW / 2, VH * 0.5, VH * 0.95);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(1, 'rgba(0,0,0,.45)');
+    rrect(ctx, 0, 0, VW, VH, 18);
+    ctx.fillStyle = v; ctx.fill();
+  }
+
+  function render(canvas) {
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    var dpr = Math.min(global.devicePixelRatio || 1, 2.5);
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(w * dpr / VW, 0, 0, h * dpr / VH, 0, 0);
+    ctx.clearRect(0, 0, VW, VH);
+    drawFrame(ctx);
+    drawBed(ctx);
+    drawTray(ctx, 'l');
+    drawTray(ctx, 'r');
+    drawPoints(ctx);
+    drawBar(ctx);
+    drawLight(ctx);
+  }
+
+  global.NardyBoard = {
+    VW: VW, VH: VH, CD: CD, DD: DD, PTW: PTW, PTH: PTH, FY0: FY0, FY1: FY1,
+    geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt, gapFor: gapFor,
+    render: render
+  };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Комментатор: реплики за столом. Три режима — «как за столом»
+   (с матом), «прилично» и «тихо». Точка зрения всегда у того,
+   кто смотрит в экран: свой бросок и чужой комментируются
+   по-разному.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var HARD = {
+    'six.foe': [
+      'Заебал, иди нахуй',
+      'Опять шеш-беш? Ты кости где брал, у напёрсточников?',
+      'Шесть-шесть. Совесть есть вообще?',
+      'Ну пиздец. Ладно, играем дальше',
+      'Да он мухлюет, зуб даю'
+    ],
+    'six.me': [
+      'Шеш-беш, блядь! Вот это по-нашему',
+      'Наконец-то кости вспомнили, кто тут хозяин',
+      'Держите меня семеро',
+      'Вот это заход, мама дорогая'
+    ],
+    'double.foe': [
+      'Да сколько можно дублей, а?',
+      'Опять дубль. Ну конечно',
+      'Ты серьёзно сейчас?',
+      'Кости к нему неровно дышат, я смотрю'
+    ],
+    'double.me': [
+      'Дубль! Живём',
+      'Кости сегодня добрые',
+      'Четыре хода. Красота'
+    ],
+    'worst.me': [
+      'Два-один. Спасибо, кости, удружили',
+      'Ну и хуйня, а не бросок',
+      'Три очка за ход. Я в ярости'
+    ],
+    'worst.foe': [
+      'Два-один. Так тебе и надо',
+      'Ха! Вот это я понимаю справедливость'
+    ],
+    'stuck.me': [
+      'Приехали. Хода нет',
+      'Ну заебись, стою как дурак',
+      'Пропускаю. Не смотрите на меня так'
+    ],
+    'stuck.foe': [
+      'Что, некуда сходить? Сочувствую. Не очень',
+      'Стоит, бедолага'
+    ],
+    'off.me': [
+      'Пошли домой, родные',
+      'Минус одна. Поехали',
+      'Так-так-так, дело пошло'
+    ],
+    'off.foe': [
+      'Э, куда потащил?',
+      'Не спеши, ещё не вечер'
+    ],
+    'head.me': [
+      'Голова не рассасывается. Пора шевелиться',
+      'Вся толпа так и сидит дома'
+    ],
+    'win.me': [
+      'Всё, забирайте деньги. Партия наша',
+      'Вот так это и делается'
+    ],
+    'win.foe': [
+      'Ладно, повезло. Ещё партию',
+      'Реванш. Немедленно'
+    ],
+    'mars.me': [
+      'Марс! Позор на весь двор',
+      'Марс, дружище. Ни одной не снял'
+    ],
+    'mars.foe': [
+      'Марс словил. Ну и вечер, блядь'
+    ]
+  };
+
+  var SOFT = {
+    'six.foe': [
+      'Опять шесть-шесть? Ну знаете',
+      'Так нечестно',
+      'Кости к нему неровно дышат'
+    ],
+    'six.me': [
+      'Шеш-беш! Вот это удача',
+      'Держите меня',
+      'Наконец-то'
+    ],
+    'double.foe': ['Снова дубль. Ну конечно', 'Да сколько можно?'],
+    'double.me': ['Дубль! Живём', 'Четыре хода. Красота'],
+    'worst.me': ['Два-один. Спасибо, кости', 'Три очка за ход. Обидно'],
+    'worst.foe': ['Два-один. Так тебе и надо'],
+    'stuck.me': ['Приехали. Хода нет', 'Пропускаю. Бывает'],
+    'stuck.foe': ['Что, некуда сходить? Сочувствую'],
+    'off.me': ['Пошли домой, родные', 'Минус одна. Поехали'],
+    'off.foe': ['Э, куда потащил?', 'Не спеши, ещё не вечер'],
+    'head.me': ['Голова не рассасывается. Пора шевелиться'],
+    'win.me': ['Вот так это и делается', 'Партия наша'],
+    'win.foe': ['Ладно, повезло. Ещё партию'],
+    'mars.me': ['Марс! Полный разгром'],
+    'mars.foe': ['Марс словил. Ну и вечер']
+  };
+
+  var last = {};      /* чтобы одна и та же реплика не шла подряд */
+  var quiet = 0;      /* пауза между репликами */
+
+  function pick(mode, key) {
+    var set = mode === 'soft' ? SOFT : HARD;
+    var list = set[key];
+    if (!list || !list.length) return null;
+    if (list.length === 1) return list[0];
+    var i, guard = 0;
+    do { i = Math.floor(Math.random() * list.length); } while (list[i] === last[key] && guard++ < 6);
+    last[key] = list[i];
+    return list[i];
+  }
+
+  /* Насколько часто событие вообще заслуживает реплики */
+  var CHANCE = {
+    six: 1, double: 0.35, worst: 0.4, stuck: 1,
+    off: 0.22, head: 1, win: 1, mars: 1
+  };
+
+  /* mode: 'hard' | 'soft' | 'off'; event: 'six', 'double', ...;
+     side: 'me' — событие у смотрящего, 'foe' — у соперника */
+  function line(mode, event, side, force) {
+    if (mode === 'off') return null;
+    var now = Date.now();
+    if (!force && now < quiet) return null;
+    if (!force && Math.random() > (CHANCE[event] || 0.3)) return null;
+    var text = pick(mode, event + '.' + side);
+    if (!text) return null;
+    quiet = now + 5000;
+    return text;
+  }
+
+  global.NardyBanter = { line: line };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Сетевой стол. Два транспорта под одним интерфейсом:
+
+   • «db» — общее хранилище опубликованной страницы. Живая
+     подписка, список открытых столов, атомарная посадка.
+     Работает только внутри организации владельца страницы.
+
+   • «relay» — бесплатный ретранслятор ntfy.sh, ни регистрации,
+     ни ключей. Состояние партии летит обычным сообщением в тему
+     nardy-<код>, подписка идёт через SSE. Работает откуда угодно,
+     в том числе с GitHub Pages, но списка столов нет: соперник
+     приходит по коду или по ссылке.
+
+   Состояние партии в обоих случаях одно и то же — целиком, одним
+   куском. Переписывает его только тот, чья очередь ходить.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var TABLES = 'tables';
+  var STALE = 6 * 60 * 60 * 1000;
+  var RELAY = 'https://ntfy.sh';
+
+  var T = null, boot = null;
+  var myId = null, myName = '';
+
+  try {
+    myId = localStorage.getItem('nardy.id');
+    myName = localStorage.getItem('nardy.name') || '';
+  } catch (e) {}
+  if (!myId) {
+    myId = 'p' + Math.random().toString(36).slice(2, 10);
+    try { localStorage.setItem('nardy.id', myId); } catch (e) {}
+  }
+
+  function code6() {
+    var s = '';
+    for (var i = 0; i < 6; i++) s += ABC[Math.floor(Math.random() * ABC.length)];
+    return s;
+  }
+
+  function clone(v) { return v ? JSON.parse(JSON.stringify(v)) : v; }
+
+  /* ---------- транспорт 1: хранилище артефакта ---------- */
+
+  function dbTransport(db, room) {
+    var cur = null;
+    function ref(code) { return db.collection(TABLES).doc(code); }
+
+    function sweep(code) { try { ref(code).delete(); } catch (e) {} }
+
+    /* раз за сеанс убираем брошенные столы, иначе они копятся */
+    try {
+      db.collection(TABLES).where('updatedAt', '<', Date.now() - STALE).limit(20).get()
+        .then(function (s) { s.docs.forEach(function (d) { sweep(d.id); }); }, function () {});
+    } catch (e) {}
+
+    return {
+      kind: 'db',
+      hasLobby: true,
+      hasPresence: !!room,
+
+      watchLobby: function (cb, onErr) {
+        var q = db.collection(TABLES).where('status', '==', 'open')
+          .orderBy('createdAt', 'desc').limit(12);
+        return q.onSnapshot(function (snap) {
+          var now = Date.now(), list = [];
+          snap.docs.forEach(function (d) {
+            var t = d.data();
+            if (!t || !t.createdAt) return;
+            if (now - t.createdAt > STALE) { sweep(d.id); return; }
+            list.push(t);
+          });
+          cb(list);
+        }, onErr);
+      },
+
+      create: function (body) {
+        var code = code6(), r = ref(code);
+        return r.get().then(function (snap) {
+          if (snap.exists) return T.create(body);
+          body.code = code;
+          return r.set(body).then(function () { cur = r; return code; });
+        });
+      },
+
+      sit: function (code, seat, who, prepare) {
+        var r = ref(code);
+        return r.acquire({ holder: myId, ttlMs: 4000 }).then(function (lease) {
+          if (!lease.acquired) return { ok: false, why: 'busy' };
+          return r.get().then(function (snap) {
+            if (!snap.exists) return { ok: false, why: 'gone' };
+            var t = clone(snap.data());
+            if (!t.seats) return { ok: false, why: 'gone' };
+            if (!seat) seat = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
+            if (!seat) return { ok: false, why: 'full' };
+            if (t.seats[seat] && t.seats[seat].id !== myId) return { ok: false, why: 'taken' };
+            t.seats[seat] = { id: myId, name: who || 'Игрок' };
+            t.updatedAt = Date.now();
+            t.seq = (t.seq || 0) + 1;
+            if (t.seats.w && t.seats.b) {
+              t.status = 'live';
+              if (prepare) prepare(t);
+            }
+            return r.set(t).then(function () {
+              cur = r;
+              return { ok: true, seat: seat, table: t };
+            });
+          });
+        });
+      },
+
+      watchTable: function (code, cb, onErr) {
+        var r = ref(code);
+        cur = r;
+        return r.onSnapshot(function (snap) {
+          cb(snap.exists ? clone(snap.data()) : null);
+        }, onErr);
+      },
+
+      write: function (body) {
+        if (!cur) return Promise.resolve();
+        return cur.set(body);
+      },
+
+      peek: function (code) {
+        return ref(code).get().then(function (s) { return s.exists ? clone(s.data()) : null; });
+      },
+
+      here: function (code, seat) {
+        if (!room || !room.presence) return;
+        try {
+          var p = room.presence({ table: code || null, seat: seat || null, id: myId, name: myName || 'Игрок' });
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) {}
+      },
+
+      watchPeers: function (cb) {
+        if (!room || !room.onPeers) return function () {};
+        try {
+          return room.onPeers(function (ch) { cb(ch && ch.peers ? ch.peers : []); }, function () {}) ||
+            function () {};
+        } catch (e) { return function () {}; }
+      }
+    };
+  }
+
+  /* ---------- транспорт 2: ретранслятор ---------- */
+
+  function relayTransport() {
+    var cur = null;
+
+    function topic(code) { return 'nardy-' + code; }
+
+    /* последнее состояние стола: берём самое свежее сообщение темы */
+    function poll(code) {
+      return fetch(RELAY + '/' + topic(code) + '/json?poll=1&since=12h', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.text() : ''; })
+        .then(function (txt) {
+          var lines = txt.split('\n'), last = null, i, o;
+          for (i = 0; i < lines.length; i++) {
+            if (!lines[i]) continue;
+            try { o = JSON.parse(lines[i]); } catch (e) { continue; }
+            if (o.event !== 'message' || !o.message) continue;
+            try { last = JSON.parse(o.message); } catch (e) {}
+          }
+          return last;
+        });
+    }
+
+    function send(body) {
+      return fetch(RELAY + '/' + topic(body.code), {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        if (!r.ok) throw new Error('relay ' + r.status);
+      });
+    }
+
+    return {
+      kind: 'relay',
+      hasLobby: false,
+      hasPresence: false,
+
+      watchLobby: function (cb) { cb([]); return function () {}; },
+
+      create: function (body) {
+        body.code = code6();
+        return send(body).then(function () { cur = body.code; return body.code; });
+      },
+
+      sit: function (code, seat, who, prepare) {
+        return poll(code).then(function (t) {
+          if (!t || !t.seats) return { ok: false, why: 'gone' };
+          t = clone(t);
+          if (!seat) seat = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
+          if (!seat) return { ok: false, why: 'full' };
+          if (t.seats[seat] && t.seats[seat].id !== myId) return { ok: false, why: 'taken' };
+          t.seats[seat] = { id: myId, name: who || 'Игрок' };
+          t.updatedAt = Date.now();
+          t.seq = (t.seq || 0) + 1;
+          t.code = code;
+          if (t.seats.w && t.seats.b) {
+            t.status = 'live';
+            if (prepare) prepare(t);
+          }
+          return send(t).then(function () {
+            cur = code;
+            return { ok: true, seat: seat, table: t };
+          });
+        });
+      },
+
+      watchTable: function (code, cb, onErr) {
+        cur = code;
+        var dead = false, seen = null, es = null, timer = null;
+
+        function deliver(t) {
+          if (dead || !t) return;
+          var key = JSON.stringify(t);
+          if (key === seen) return;
+          seen = key;
+          cb(t);
+        }
+
+        poll(code).then(deliver, function () {});
+
+        try {
+          es = new EventSource(RELAY + '/' + topic(code) + '/sse');
+          es.onmessage = function (e) {
+            var o;
+            try { o = JSON.parse(e.data); } catch (err) { return; }
+            if (o.event !== 'message' || !o.message) return;
+            try { deliver(JSON.parse(o.message)); } catch (err) {}
+          };
+          es.onerror = function () { /* EventSource переподключается сам */ };
+        } catch (e) {
+          if (onErr) onErr({ code: 'unavailable', message: 'нет подписки' });
+        }
+
+        /* страховка на случай разрыва: тихо перечитываем тему */
+        timer = setInterval(function () {
+          poll(code).then(deliver, function () {});
+        }, 25000);
+
+        return function () {
+          dead = true;
+          clearInterval(timer);
+          if (es) es.close();
+        };
+      },
+
+      write: function (body) {
+        if (!cur) return Promise.resolve();
+        body.code = cur;
+        return send(body);
+      },
+
+      peek: function (code) { return poll(code); },
+      here: function () {},
+      watchPeers: function () { return function () {}; }
+    };
+  }
+
+  /* ---------- выбор транспорта ---------- */
+
+  function connect() {
+    if (boot) return boot;
+    boot = pickTransport().then(function (t) { T = t; return t; });
+    return boot;
+  }
+
+  function pickTransport() {
+    if (global.claude && typeof global.claude.use === 'function') {
+      return global.claude.use('db').then(function (db) {
+        if (!db) return relayIfPossible();
+        return global.claude.use('room').then(
+          function (room) { return dbTransport(db, room || null); },
+          function () { return dbTransport(db, null); }
+        );
+      }, function () { return relayIfPossible(); });
+    }
+    return Promise.resolve(relayIfPossible());
+  }
+
+  /* Ретранслятор нужен снаружи: со страницы артефакта наружу не пускает
+     политика безопасности, а с file:// запросы часто рубит CORS. */
+  function relayIfPossible() {
+    if (global.claude && typeof global.claude.use === 'function') return null;
+    if (global.location.protocol !== 'http:' && global.location.protocol !== 'https:') return null;
+    if (typeof fetch !== 'function' || typeof EventSource !== 'function') return null;
+    return relayTransport();
+  }
+
+  function api(name) {
+    return function () {
+      if (!T) return name === 'watchLobby' || name === 'watchPeers' || name === 'watchTable'
+        ? function () {} : Promise.resolve(null);
+      return T[name].apply(T, arguments);
+    };
+  }
+
+  global.NardyNet = {
+    connect: connect,
+    id: function () { return myId; },
+    name: function () { return myName; },
+    rename: function (n) {
+      myName = (n || '').slice(0, 18);
+      try { localStorage.setItem('nardy.name', myName); } catch (e) {}
+    },
+    kind: function () { return T ? T.kind : null; },
+    hasLobby: function () { return !!(T && T.hasLobby); },
+    hasRoom: function () { return !!(T && T.hasPresence); },
+    watchLobby: api('watchLobby'),
+    create: api('create'),
+    sit: api('sit'),
+    watchTable: api('watchTable'),
+    write: api('write'),
+    peek: api('peek'),
+    here: api('here'),
+    watchPeers: api('watchPeers'),
+    leave: function () { if (T) T.here(null, null); }
+  };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Нарды — интерфейс: расстановка шашек, ходы, диалоги, звук
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var N = window.Nardy, B = window.NardyBoard, AI = window.NardyAI;
+  var $ = function (id) { return document.getElementById(id); };
+
+  var board = $('board'), scene = $('scene');
+  var lZones = $('zones'), lMen = $('men'), lSpots = $('spots'), lDice = $('dice');
+
+  var S = null;              /* состояние партии */
+  var VIS = null;            /* какие шашки где лежат: { pts: [..], off: {} } */
+  var men = {};              /* id шашки -> элемент */
+  var pos = {};              /* id -> {x,y} в пикселях */
+  var tags = [];             /* счётчики на высоких стопках */
+  var sel = null;            /* выбранный пункт */
+  var legal = [];
+  var busy = true;
+  var undoStack = [];
+  var rows = [];             /* журнал ходов */
+  var tally = { w: 0, b: 0 };
+  var drag = null;
+  var hinted = null;
+
+  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, banter: 'hard' };
+  try {
+    var prefs = JSON.parse(localStorage.getItem('nardy.opts') || 'null');
+    if (prefs) { for (var k in prefs) if (opts[k] !== undefined) opts[k] = prefs[k]; }
+    var sc = JSON.parse(localStorage.getItem('nardy.tally') || 'null');
+    if (sc) tally = sc;
+  } catch (e) { /* приватный режим — просто играем без сохранения */ }
+
+  function save() {
+    try {
+      localStorage.setItem('nardy.opts', JSON.stringify(opts));
+      localStorage.setItem('nardy.tally', JSON.stringify(tally));
+    } catch (e) {}
+  }
+
+  /* Незаконченная партия переживает перезагрузку страницы */
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem('nardy.game') || 'null'); } catch (e) {}
+  if (saved && (!saved.s || saved.s.winner)) saved = null;
+
+  function persist() {
+    if (opts.mode === 'net') return;
+    try {
+      localStorage.setItem('nardy.game', JSON.stringify({ s: S, rows: rows }));
+    } catch (e) {}
+  }
+
+  function forget() {
+    saved = null;
+    try { localStorage.removeItem('nardy.game'); } catch (e) {}
+  }
+
+  function isAI(p) { return opts.mode === 'ai' && p !== opts.human; }
+  function nameOf(p) { return p === 'w' ? 'Белые' : 'Чёрные'; }
+
+  /* ---------- сетевой стол ---------- */
+
+  var net = {
+    ready: null,      /* null — проверяем, false — сети нет */
+    code: null,
+    seat: null,
+    table: null,
+    unsub: null,
+    unpeers: null,
+    peers: [],
+    shown: false,     /* итог партии уже показан */
+    toss: null
+  };
+  var lobbyOff = null;
+  var banterHead = false;   /* подкол про засидевшуюся голову — один раз за партию */
+
+  function isNet() { return opts.mode === 'net' && !!net.code; }
+
+  /* Ссылка, по которой соперник попадает сразу за стол */
+  function shareLink() {
+    return location.origin + location.pathname + location.search + '#stol=' + net.code;
+  }
+
+  function readInvite() {
+    var m = /[#?&]stol=([A-Za-z0-9]{4,8})/.exec(location.hash + location.search);
+    return m ? m[1].toUpperCase() : null;
+  }
+
+  function forgetInvite() {
+    try {
+      history.replaceState(null, '', location.pathname + location.search);
+    } catch (e) {}
+  }
+
+  /* Чей сейчас ход с точки зрения этого устройства */
+  function mine() {
+    if (!S || S.winner) return false;
+    return isNet() ? net.seat === S.turn : !isAI(S.turn);
+  }
+
+  function canPlay() { return !busy && !!S && !S.winner && mine(); }
+
+  function esc(t) {
+    return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function sig(st) {
+    return st.points.join(',') + '|' + st.off.w + ':' + st.off.b + '|' + st.turn +
+      '|' + st.dice.slice().sort().join('') + '|' + st.roll.join('') +
+      '|' + st.headUsed + '|' + (st.winner || '');
+  }
+
+  /* ---------- звук ---------- */
+
+  var actx = null;
+  function ac() {
+    if (!actx) {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return null;
+      actx = new A();
+    }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+
+  function noise(dur, freq, q, gain, delay) {
+    var c = ac(); if (!c) return;
+    var t = c.currentTime + (delay || 0);
+    var len = Math.max(1, Math.ceil(c.sampleRate * dur));
+    var buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0), i;
+    for (i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+    var src = c.createBufferSource(); src.buffer = buf;
+    var f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    var g = c.createGain(); g.gain.value = gain;
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start(t);
+  }
+
+  function tone(freq, dur, gain, delay, type) {
+    var c = ac(); if (!c) return;
+    var t = c.currentTime + (delay || 0);
+    var o = c.createOscillator(); o.type = type || 'triangle';
+    o.frequency.setValueAtTime(freq, t);
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function sfx(kind) {
+    if (!opts.sound) return;
+    try {
+      if (kind === 'move') { noise(0.05, 2400, 1.2, 0.16); tone(220, 0.07, 0.05, 0, 'square'); }
+      else if (kind === 'dice') {
+        noise(0.07, 1500, 0.8, 0.13, 0);
+        noise(0.06, 2100, 1.0, 0.11, 0.09);
+        noise(0.09, 1200, 0.7, 0.15, 0.19);
+      }
+      else if (kind === 'off') { tone(880, 0.16, 0.07, 0); tone(1320, 0.2, 0.05, 0.05); }
+      else if (kind === 'win') {
+        [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.5, 0.07, i * 0.11, 'triangle'); });
+      }
+      else if (kind === 'no') { tone(150, 0.16, 0.06, 0, 'sawtooth'); }
+    } catch (e) {}
+  }
+
+  /* ---------- построение доски ---------- */
+
+  function buildZones() {
+    lZones.innerHTML = '';
+    for (var i = 0; i < 24; i++) {
+      var g = B.geom(i), z = document.createElement('div');
+      z.className = 'zone';
+      z.dataset.i = i;
+      z.dataset.row = g.top ? 'top' : 'bottom';
+      z.style.left = (g.x / B.VW * 100) + '%';
+      z.style.top = (g.y / B.VH * 100) + '%';
+      z.style.width = (g.w / B.VW * 100) + '%';
+      z.style.height = (g.h / B.VH * 100) + '%';
+      lZones.appendChild(z);
+    }
+    /* лотки: бросить шашку в лоток = снять её с доски */
+    ['w', 'b'].forEach(function (p) {
+      var t = B.trayBox(p), e = document.createElement('div');
+      e.className = 'zone tray';
+      e.dataset.tray = p;
+      e.style.left = (t.x / B.VW * 100) + '%';
+      e.style.top = (t.y / B.VH * 100) + '%';
+      e.style.width = (t.w / B.VW * 100) + '%';
+      e.style.height = (t.h / B.VH * 100) + '%';
+      lZones.appendChild(e);
+    });
+  }
+
+  function buildMen() {
+    lMen.innerHTML = '';
+    men = {}; tags = [];
+    ['w', 'b'].forEach(function (p) {
+      for (var i = 0; i < N.NC; i++) {
+        var e = document.createElement('div');
+        e.className = 'man ' + p;
+        e.dataset.id = p + i;
+        lMen.appendChild(e);
+        men[p + i] = e;
+      }
+    });
+    for (var t = 0; t < 24; t++) {
+      var tg = document.createElement('div');
+      tg.className = 'tag';
+      tg.style.display = 'none';
+      lMen.appendChild(tg);
+      tags.push(tg);
+    }
+  }
+
+  /* Раскладка шашек выводится из позиции: один источник правды */
+  function visFrom(st) {
+    var v = { pts: [], off: { w: [], b: [] } }, i, j, c;
+    for (i = 0; i < 24; i++) v.pts.push([]);
+    ['w', 'b'].forEach(function (p) {
+      var next = 0;
+      for (i = 0; i < 24; i++) {
+        c = N.cnt(st, i, p);
+        for (j = 0; j < c; j++) v.pts[i].push(p + (next++));
+      }
+      for (j = 0; j < st.off[p]; j++) v.off[p].push(p + (next++));
+    });
+    return v;
+  }
+
+  function scale() { return board.clientWidth / B.VW; }
+
+  function setT(id, x, y, extra) {
+    pos[id] = { x: x, y: y };
+    men[id].style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)' + (extra || '');
+  }
+
+  function place(instant) {
+    var k = scale(), i, j, ids, n, p, id;
+    if (!k) return;
+    lMen.style.setProperty('--cd', (B.CD * k) + 'px');
+    lSpots.style.setProperty('--cd', (B.CD * k) + 'px');
+    lDice.style.setProperty('--dd', (B.DD * k) + 'px');
+
+    if (instant) {
+      lMen.style.transition = 'none';
+      for (id in men) men[id].style.transition = 'none';
+    }
+
+    for (i = 0; i < 24; i++) {
+      ids = VIS.pts[i]; n = ids.length;
+      for (j = 0; j < n; j++) {
+        p = B.manAt(i, j, n);
+        var lift = (sel === i && j === n - 1) ? ' scale(1.06)' : '';
+        setT(ids[j], p.x * k, p.y * k, lift);
+        men[ids[j]].style.zIndex = 1 + j;
+        men[ids[j]].classList.toggle('pick', sel === i && j === n - 1);
+      }
+      var tg = tags[i];
+      if (n > 5) {
+        var top = B.manAt(i, n - 1, n);
+        tg.style.display = '';
+        tg.textContent = n;
+        tg.style.transform = 'translate3d(' + (top.x * k).toFixed(1) + 'px,' +
+          (top.y * k + B.CD * k * 0.32).toFixed(1) + 'px,0)';
+        tg.className = 'tag' + (VIS.pts[i][0][0] === 'b' ? ' on-dark' : '');
+      } else tg.style.display = 'none';
+    }
+
+    ['w', 'b'].forEach(function (pl) {
+      VIS.off[pl].forEach(function (mid, idx) {
+        var q = B.trayAt(pl, idx);
+        setT(mid, q.x * k, q.y * k);
+        men[mid].style.zIndex = 1 + idx;
+      });
+    });
+
+    if (instant) {
+      void lMen.offsetHeight;
+      lMen.style.transition = '';
+      for (id in men) men[id].style.transition = '';
+    }
+    renderDice(false);
+    renderSpots();
+    markLive();
+  }
+
+  /* Пункты, с которых сейчас есть ход */
+  function markLive() {
+    var live = {};
+    if (!busy && mine()) {
+      legal.forEach(function (m) {
+        live[m.from] = 1;
+        if (m.to === N.OFF) live.off = 1;
+      });
+    }
+    for (var i = 0; i < 24; i++) lZones.children[i].classList.toggle('live', !!live[i]);
+    var off = !!live.off && sel !== null && destFor(sel).some(function (m) { return m.to === N.OFF; });
+    lZones.children[24].classList.toggle('live', off && S.turn === 'w');
+    lZones.children[25].classList.toggle('live', off && S.turn === 'b');
+  }
+
+  /* ---------- кости ---------- */
+
+  var PIPS = {
+    1: [[50, 50]],
+    2: [[26, 26], [74, 74]],
+    3: [[26, 26], [50, 50], [74, 74]],
+    4: [[26, 26], [74, 26], [26, 74], [74, 74]],
+    5: [[26, 26], [74, 26], [50, 50], [26, 74], [74, 74]],
+    6: [[26, 24], [74, 24], [26, 50], [74, 50], [26, 76], [74, 76]]
+  };
+
+  /* Кость лежит в обёртке: обёртка задаёт место, анимация крутит саму кость */
+  function dieEl(value, dark, used, x, y, delay) {
+    var wrap = document.createElement('div');
+    wrap.className = 'die-wrap';
+    wrap.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
+    var d = document.createElement('div');
+    d.className = 'die' + (dark ? ' dark' : '') + (used ? ' used' : '');
+    if (delay !== null) {
+      d.style.animationDelay = delay + 'ms';
+      d.classList.add('tumble');
+    }
+    PIPS[value].forEach(function (c) {
+      var i = document.createElement('i');
+      i.style.left = (c[0] - 8.5) + '%';
+      i.style.top = (c[1] - 8.5) + '%';
+      d.appendChild(i);
+    });
+    wrap.appendChild(d);
+    return wrap;
+  }
+
+  function renderDice(animate) {
+    lDice.innerHTML = '';
+    if (!S || !S.roll.length) return;
+    var k = scale();
+    var vals = S.roll[0] === S.roll[1] ? [S.roll[0], S.roll[0], S.roll[0], S.roll[0]] : S.roll.slice();
+    var left = S.dice.slice();
+    vals.forEach(function (v, idx) {
+      var used = true, at = left.indexOf(v);
+      if (at >= 0) { used = false; left.splice(at, 1); }
+      var q = B.diceAt(S.turn, idx, vals.length);
+      lDice.appendChild(dieEl(v, S.turn === 'b', used, q.x * k, q.y * k, animate ? idx * 45 : null));
+    });
+  }
+
+  /* костяшки при жеребьёвке — по одной каждому */
+  function renderOpeningDice(a, b) {
+    lDice.innerHTML = '';
+    var k = scale();
+    [['w', a], ['b', b]].forEach(function (pair) {
+      var q = B.diceAt(pair[0], 0, 1);
+      lDice.appendChild(dieEl(pair[1], pair[0] === 'b', false, q.x * k, q.y * k, 0));
+    });
+  }
+
+  /* ---------- метки возможных ходов ---------- */
+
+  function destFor(i) {
+    return legal.filter(function (m) { return m.from === i; });
+  }
+
+  function renderSpots() {
+    lSpots.innerHTML = '';
+    if (sel === null || busy) return;
+    var k = scale(), seen = {};
+    destFor(sel).forEach(function (m) {
+      if (seen[m.to] !== undefined) return;
+      seen[m.to] = m.die;
+      var q, n;
+      if (m.to === N.OFF) {
+        q = B.trayAt(S.turn, VIS.off[S.turn].length);
+      } else {
+        n = VIS.pts[m.to].length + 1;
+        q = B.manAt(m.to, n - 1, n);
+      }
+      var s = document.createElement('div');
+      s.className = 'spot';
+      s.dataset.to = m.to;
+      s.dataset.die = m.die;
+      s.innerHTML = '<em>' + m.die + '</em>';
+      s.style.transform = 'translate3d(' + (q.x * k).toFixed(1) + 'px,' + (q.y * k).toFixed(1) + 'px,0)';
+      lSpots.appendChild(s);
+    });
+  }
+
+  /* ---------- панели ---------- */
+
+  /* Реплика комментатора. side: 'me' — событие у того, кто смотрит */
+  function sideOf(p) {
+    var who = isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : null);
+    return (who && p === who) ? 'me' : 'foe';
+  }
+
+  function quip(event, who, force) {
+    var text = NardyBanter.line(opts.banter, event, sideOf(who), force);
+    if (!text) return;
+    var q = $('quip');
+    q.textContent = text;
+    q.classList.add('show');
+    clearTimeout(quip._t);
+    quip._t = setTimeout(function () { q.classList.remove('show'); }, 3400);
+  }
+
+  function hushQuip() {
+    $('quip').classList.remove('show');
+    clearTimeout(quip._t);
+  }
+
+  function toast(text, ms) {
+    var t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove('show'); }, ms || 1900);
+  }
+
+  function updateUI() {
+    if (!S) return;
+    $('pip-w').textContent = N.pips(S, 'w');
+    $('pip-b').textContent = N.pips(S, 'b');
+    $('off-w').textContent = S.off.w;
+    $('off-b').textContent = S.off.b;
+    $('tally-w').textContent = tally.w;
+    $('tally-b').textContent = tally.b;
+    var chip = $('net-chip');
+    chip.hidden = !isNet();
+    if (isNet()) chip.textContent = 'стол ' + net.code;
+    $('pl-w').classList.toggle('act', !S.winner && S.turn === 'w');
+    $('pl-b').classList.toggle('act', !S.winner && S.turn === 'b');
+    var lvl = { easy: 'Новичок', normal: 'Опытный', hard: 'Мастер' }[opts.level];
+    if (isNet()) {
+      $('meta-w').textContent = seatLabel('w');
+      $('meta-b').textContent = seatLabel('b');
+    } else {
+      $('meta-w').textContent = isAI('w') ? 'Компьютер · ' + lvl : 'Игрок';
+      $('meta-b').textContent = isAI('b') ? 'Компьютер · ' + lvl : 'Игрок';
+    }
+    var my = canPlay();
+    $('act-undo').disabled = !(my && undoStack.length);
+    $('act-hint').disabled = !(my && legal.length);
+    $('act-sound').setAttribute('aria-pressed', String(opts.sound));
+    $('act-sound').textContent = opts.sound ? '♪' : '✕';
+    $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
+  }
+
+  function renderLog() {
+    var ol = $('log');
+    ol.innerHTML = '';
+    rows.slice(-40).forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = r.p;
+      li.innerHTML = '<b>' + nameOf(r.p) + ' ' + r.roll.join('-') + '</b><span>' +
+        (r.moves.length ? r.moves.join(' ') : (r === rows[rows.length - 1] ? '…' : 'пропуск')) + '</span>';
+      ol.appendChild(li);
+    });
+  }
+
+  /* ---------- ход ---------- */
+
+  /* Пока тикает таймер, состояние может смениться (пришёл ход соперника).
+     Такой отложенный вызов нужно отменить, иначе он сработает не по той партии. */
+  var tick = 0;
+
+  function later(ms, fn) {
+    var at = tick;
+    setTimeout(function () { if (at === tick) fn(); }, ms);
+  }
+
+  function snapshot() {
+    return {
+      st: N.clone(S),
+      vis: {
+        pts: VIS.pts.map(function (a) { return a.slice(); }),
+        off: { w: VIS.off.w.slice(), b: VIS.off.b.slice() }
+      },
+      moves: rows.length ? rows[rows.length - 1].moves.length : 0
+    };
+  }
+
+  function doMove(mv) {
+    tick++;
+    undoStack.push(snapshot());
+    var p = S.turn;
+    var id = VIS.pts[mv.from].pop();
+    if (mv.to === N.OFF) VIS.off[p].push(id); else VIS.pts[mv.to].push(id);
+    N.applyTo(S, mv);
+    if (rows.length) {
+      rows[rows.length - 1].moves.push(N.label(p, mv.from) + '/' + N.label(p, mv.to));
+    }
+    sel = null;
+    clearHint();
+    place(false);
+    men[id].classList.remove('land');
+    void men[id].offsetWidth;
+    men[id].classList.add('land');
+    sfx(mv.to === N.OFF ? 'off' : 'move');
+    if (mv.to === N.OFF) quip('off', p);
+    renderLog();
+    updateUI();
+    persist();
+    /* победный ход уходит одной записью вместе со счётом — см. finish() */
+    if (!S.winner) pushTable();
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    var s = undoStack.pop();
+    S = s.st;
+    VIS = s.vis;
+    if (rows.length) rows[rows.length - 1].moves.length = s.moves;
+    sel = null;
+    legal = N.legalMoves(S);
+    place(false);
+    renderLog();
+    updateUI();
+    pushTable();
+  }
+
+  function afterMove() {
+    if (S.winner) { finish(); return; }
+    legal = N.legalMoves(S);
+    if (!legal.length) {
+      if (S.dice.length && !isAI(S.turn)) toast('Больше ходить нечем');
+      later(850, passTurn);
+      return;
+    }
+    if (!isAI(S.turn)) { busy = false; renderSpots(); }
+    markLive();
+    updateUI();
+  }
+
+  function passTurn() {
+    if (S.winner) { finish(); return; }
+    N.endTurn(S);
+    if (isNet()) { busy = true; legal = []; markLive(); updateUI(); pushTable(); return; }
+    beginTurn();
+  }
+
+  function beginTurn() {
+    sel = null;
+    undoStack = [];
+    clearHint();
+    busy = true;
+    tick++;
+    var d1 = N.rollDie(), d2 = N.rollDie();
+    N.setRoll(S, d1, d2);
+    rows.push({ p: S.turn, roll: [d1, d2], moves: [] });
+    renderDice(true);
+    renderLog();
+    sfx('dice');
+    legal = N.legalMoves(S);
+    updateUI();
+    persist();
+    pushTable();
+    if (d1 === d2) quip(d1 === 6 ? 'six' : 'double', S.turn, d1 === 6);
+    else if (d1 + d2 === 3) quip('worst', S.turn);
+    else if (S.turnNo[S.turn] >= 8 && N.cnt(S, N.HEAD[S.turn], S.turn) >= 10 &&
+             sideOf(S.turn) === 'me' && !banterHead) {
+      banterHead = true;
+      quip('head', S.turn);
+    }
+    if (!legal.length) {
+      toast(nameOf(S.turn) + ': ходов нет');
+      sfx('no');
+      quip('stuck', S.turn, true);
+      later(1500, passTurn);
+      return;
+    }
+    if (isAI(S.turn)) later(700, aiTurn);
+    else { busy = false; markLive(); updateUI(); }
+  }
+
+  function aiTurn() {
+    var path = AI.choose(S, opts.level);
+    if (!path.length) { passTurn(); return; }
+    (function step(i) {
+      if (i >= path.length || S.winner) { afterMove(); return; }
+      doMove(path[i]);
+      later(500, function () { step(i + 1); });
+    })(0);
+  }
+
+  /* ---------- выбор шашки ---------- */
+
+  function pick(i) {
+    sel = i;
+    place(false);
+    renderSpots();
+    markLive();
+  }
+
+  function clearSel() {
+    if (sel === null) return;
+    sel = null;
+    place(false);
+    renderSpots();
+  }
+
+  function clearHint() {
+    if (hinted && men[hinted]) men[hinted].classList.remove('hint');
+    hinted = null;
+  }
+
+  function tryMoveTo(to, die) {
+    var ms = destFor(sel).filter(function (m) { return m.to === to; });
+    if (!ms.length) return false;
+    var mv = ms[0];
+    if (die) { ms.forEach(function (m) { if (m.die === die) mv = m; }); }
+    busy = true;
+    doMove(mv);
+    later(260, afterMove);
+    return true;
+  }
+
+  function canPick(i) {
+    return legal.some(function (m) { return m.from === i; });
+  }
+
+  /* ---------- указатель: клик и перетаскивание ---------- */
+
+  function onDown(e) {
+    if (!canPlay()) return;
+    var spot = e.target.closest ? e.target.closest('.spot') : null;
+    if (spot) {
+      tryMoveTo(+spot.dataset.to, +spot.dataset.die);
+      return;
+    }
+    var z = e.target.closest ? e.target.closest('.zone') : null;
+    if (!z) { clearSel(); return; }
+    if (z.dataset.tray) {
+      if (z.dataset.tray === S.turn && sel !== null) tryMoveTo(N.OFF);
+      return;
+    }
+    var i = +z.dataset.i;
+    if (sel !== null && sel !== i && tryMoveTo(i)) return;
+    if (!canPick(i)) {
+      if (N.cnt(S, i, S.turn) > 0) toast('Этой шашкой сейчас не сходить');
+      clearSel();
+      return;
+    }
+    if (sel === i) { clearSel(); return; }
+    pick(i);
+    var ids = VIS.pts[i];
+    var id = ids[ids.length - 1];
+    drag = { id: id, from: i, x0: e.clientX, y0: e.clientY, moved: false };
+    try { lZones.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+
+  /* В портретном режиме доска повёрнута — сдвиг пальца надо развернуть тоже */
+  var rotQuery = window.matchMedia('(max-width: 700px) and (orientation: portrait)');
+
+  function onMove(e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0, t;
+    if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 7) return;
+    if (rotQuery.matches) { t = dx; dx = dy; dy = -t; }
+    drag.moved = true;
+    var el = men[drag.id], p = pos[drag.id];
+    el.style.transition = 'none';
+    el.style.zIndex = 30;
+    el.style.transform = 'translate3d(' + (p.x + dx) + 'px,' + (p.y + dy) + 'px,0) scale(1.1)';
+  }
+
+  function onCancel() {
+    if (!drag) return;
+    drag = null;
+    place(false);
+  }
+
+  function onUp(e) {
+    if (!drag) return;
+    var d = drag; drag = null;
+    try { lZones.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (!d.moved) return;
+    men[d.id].style.transition = '';
+    lSpots.style.pointerEvents = 'none';
+    var under = document.elementFromPoint(e.clientX, e.clientY);
+    lSpots.style.pointerEvents = '';
+    var spot = under && under.closest ? under.closest('.spot') : null;
+    var zone = under && under.closest ? under.closest('.zone') : null;
+    var ok = false;
+    if (spot) ok = tryMoveTo(+spot.dataset.to, +spot.dataset.die);
+    else if (zone && zone.dataset.tray === S.turn) ok = tryMoveTo(N.OFF);
+    else if (zone && !zone.dataset.tray) ok = tryMoveTo(+zone.dataset.i);
+    if (!ok) place(false);
+  }
+
+  /* ---------- подсказка ---------- */
+
+  function hint() {
+    if (!canPlay() || !legal.length) return;
+    var path = AI.choose(S, 'hard');
+    if (!path.length) return;
+    var mv = path[0];
+    pick(mv.from);
+    var ids = VIS.pts[mv.from];
+    hinted = ids[ids.length - 1];
+    men[hinted].classList.add('hint');
+    toast('Совет: ' + N.label(S.turn, mv.from) + '/' + N.label(S.turn, mv.to));
+  }
+
+  /* ---------- игра по сети ---------- */
+
+  function seatLabel(p) {
+    var who = net.table && net.table.seats ? net.table.seats[p] : null;
+    if (!who) return 'место свободно';
+    if (who.id === NardyNet.id()) return esc(who.name || 'Игрок') + ' · вы';
+    var tag = NardyNet.hasRoom() ? (oppOnline(p) ? ' · в сети' : ' · не в сети') : '';
+    return esc(who.name || 'Игрок') + tag;
+  }
+
+  function oppOnline(p) {
+    for (var i = 0; i < net.peers.length; i++) {
+      var pr = net.peers[i].presence;
+      if (pr && pr.table === net.code && pr.seat === p && !net.peers[i].isMe) return true;
+    }
+    return false;
+  }
+
+  /* Полное тело документа стола */
+  function tableBody(extra) {
+    var t = net.table || {};
+    var b = {
+      v: 1,
+      seq: (t.seq || 0) + 1,      /* растущий номер: отсеиваем отставшие копии */
+      code: net.code,
+      status: 'live',
+      createdAt: t.createdAt || Date.now(),
+      updatedAt: Date.now(),
+      seats: t.seats || { w: null, b: null },
+      state: S,
+      rows: rows.slice(-60),
+      tally: tally,
+      toss: t.toss || null
+    };
+    if (extra) for (var k in extra) b[k] = extra[k];
+    return b;
+  }
+
+  function pushTable(extra) {
+    if (!isNet()) return;
+    net.table = tableBody(extra);
+    NardyNet.write(net.table).then(null, function () {
+      toast('Ход не ушёл — проверьте связь');
+    });
+  }
+
+  /* Двигаем к новой позиции те шашки, которые действительно сдвинулись,
+     иначе анимация превратилась бы в телепортацию всей доски. */
+  function reconcile() {
+    ['w', 'b'].forEach(function (p) {
+      var pool = [], take = [], give = [], i, j, k, arr, have, need;
+      for (i = 0; i < 24; i++) {
+        arr = VIS.pts[i];
+        have = 0;
+        for (j = 0; j < arr.length; j++) if (arr[j].charAt(0) === p) have++;
+        need = N.cnt(S, i, p);
+        if (have > need) take.push([i, have - need]);
+        else if (need > have) give.push([i, need - have]);
+      }
+      take.sort(function (a, b) { return N.rel(p, a[0]) - N.rel(p, b[0]); });
+      give.sort(function (a, b) { return N.rel(p, a[0]) - N.rel(p, b[0]); });
+      take.forEach(function (t) {
+        arr = VIS.pts[t[0]];
+        for (k = 0; k < t[1]; k++) {
+          for (j = arr.length - 1; j >= 0; j--) {
+            if (arr[j].charAt(0) === p) { pool.push(arr.splice(j, 1)[0]); break; }
+          }
+        }
+      });
+      while (VIS.off[p].length > S.off[p]) pool.push(VIS.off[p].pop());
+      give.forEach(function (g) {
+        for (k = 0; k < g[1] && pool.length; k++) VIS.pts[g[0]].push(pool.shift());
+      });
+      while (VIS.off[p].length < S.off[p] && pool.length) VIS.off[p].push(pool.shift());
+    });
+    if (!visOk()) VIS = visFrom(S);
+    place(false);
+  }
+
+  function visOk() {
+    var i, j, arr, w, b;
+    for (i = 0; i < 24; i++) {
+      arr = VIS.pts[i]; w = 0; b = 0;
+      for (j = 0; j < arr.length; j++) arr[j].charAt(0) === 'w' ? w++ : b++;
+      if (w && b) return false;
+      if (w !== N.cnt(S, i, 'w') || b !== N.cnt(S, i, 'b')) return false;
+    }
+    return VIS.off.w.length === S.off.w && VIS.off.b.length === S.off.b;
+  }
+
+  /* Единственный источник правды в сетевой партии — документ стола */
+  function syncFrom(t) {
+    if (!t) {
+      toast('Стол закрыт');
+      quitTable(true);
+      return;
+    }
+    if (net.table && (t.seq || 0) < (net.table.seq || 0)) return;   /* пришла старая копия */
+    net.table = t;
+    if (t.status === 'open') {
+      updateUI();
+      if (sheet.dataset.kind === 'table' && veil.classList.contains('show')) tableSheet();
+      return;
+    }
+    if (sheet.dataset.kind === 'table' && veil.classList.contains('show')) {
+      closeSheet();
+      var opp = t.seats[N.opp(net.seat)];
+      toast((opp && opp.name ? esc(opp.name) : 'Соперник') + ' за столом — начинаем');
+    }
+    var st = t.state;
+    if (!st || !st.points) return;
+    var fresh = !S || sig(st) !== sig(S);
+    if (fresh) {
+      tick++;                       /* всё отложенное по старой позиции отменяем */
+      var rolled = !S || S.roll.join() !== st.roll.join() || S.turn !== st.turn;
+      S = st;
+      rows = t.rows || [];
+      if (!VIS) VIS = visFrom(S);
+      reconcile();
+      renderDice(rolled);
+      renderLog();
+      sel = null;
+      undoStack = [];
+    }
+    if (t.tally) tally = t.tally;
+    /* соперник начал новую партию — убираем со своего экрана итог прошлой */
+    if (fresh && !st.winner && sheet.dataset.kind === 'result' && veil.classList.contains('show')) {
+      closeSheet();
+    }
+    if (t.toss && net.toss !== t.toss.n && !rows.length) {
+      net.toss = t.toss.n;
+      toast('Жеребьёвка: ' + t.toss.a + ' — ' + t.toss.b + '. Первыми ходят ' +
+        (st.turn === 'w' ? 'белые' : 'чёрные'), 1800);
+    }
+    updateUI();
+    if (S.winner) {
+      if (!net.shown) finish(false);
+      return;
+    }
+    if (!fresh) return;
+    if (net.seat === S.turn) {
+      if (!S.dice.length) { beginTurn(); return; }
+      legal = N.legalMoves(S);
+      if (!legal.length) { busy = true; later(900, passTurn); return; }
+      busy = false;
+      markLive();
+      updateUI();
+    } else {
+      busy = true;
+      legal = [];
+      markLive();
+      updateUI();
+    }
+  }
+
+  function toss() {
+    var a, b;
+    do { a = N.rollDie(); b = N.rollDie(); } while (a === b);
+    return { a: a, b: b, n: Date.now(), turn: a > b ? 'w' : 'b' };
+  }
+
+  function openTable(code) {
+    if (net.unsub) net.unsub();
+    if (net.unpeers) net.unpeers();
+    net.code = code;
+    net.shown = false;
+    opts.mode = 'net';
+    try { localStorage.setItem('nardy.net', JSON.stringify({ code: code, seat: net.seat })); } catch (e) {}
+    buildMen();
+    place(true);
+    updateUI();
+    net.unsub = NardyNet.watchTable(code, syncFrom, function () {
+      toast('Связь со столом потеряна');
+    });
+    NardyNet.here(code, net.seat);
+    net.unpeers = NardyNet.watchPeers(function (peers) {
+      net.peers = peers;
+      updateUI();
+    });
+  }
+
+  function createTable() {
+    var seat = opts.human === 'b' ? 'b' : 'w';
+    var seats = { w: null, b: null };
+    seats[seat] = { id: NardyNet.id(), name: NardyNet.name() || 'Игрок' };
+    var fresh = N.create();
+    net.seat = seat;
+    net.table = null;
+    S = null;
+    rows = [];
+    VIS = visFrom(fresh);
+    var body = {
+      v: 1, seq: 1, status: 'open', createdAt: Date.now(), updatedAt: Date.now(),
+      seats: seats, state: fresh, rows: [], tally: { w: 0, b: 0 }, toss: null
+    };
+    NardyNet.create(body).then(function (code) {
+      tally = { w: 0, b: 0 };
+      net.table = body;        /* что опубликовали, то и знаем — эха не ждём */
+      openTable(code);
+      tableSheet();
+    }, function () { toast('Не удалось создать стол'); });
+  }
+
+  function sitDown(code) {
+    code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 4 || code.length > 8) { toast('Код стола — шесть знаков'); return; }
+    NardyNet.sit(code, null, NardyNet.name() || 'Игрок', function (t) {
+      var st = t.state;
+      if (!t.toss && !st.roll.length && !st.turnNo.w && !st.turnNo.b) {
+        var x = toss();
+        st.turn = x.turn;
+        t.toss = x;
+      }
+    }).then(function (r) {
+      if (!r.ok) {
+        toast({
+          busy: 'За стол как раз садится другой — попробуйте ещё раз',
+          gone: 'Такого стола нет',
+          full: 'За столом уже двое',
+          taken: 'Это место занято'
+        }[r.why] || 'Не вышло сесть за стол');
+        return;
+      }
+      net.seat = r.seat;
+      net.table = r.table;
+      S = null;
+      rows = [];
+      VIS = visFrom(r.table.state);
+      closeSheet();
+      openTable(code);
+      syncFrom(r.table);
+    }, function () { toast('Не удалось сесть за стол'); });
+  }
+
+  function rematch() {
+    if (!isNet()) { newGame(); return; }
+    var t = toss(), st = N.create();
+    st.turn = t.turn;
+    net.shown = false;
+    banterHead = false;
+    hushQuip();
+    net.toss = null;
+    closeSheet();
+    NardyNet.write({
+      v: 1, seq: ((net.table && net.table.seq) || 0) + 1, code: net.code, status: 'live',
+      createdAt: (net.table && net.table.createdAt) || Date.now(), updatedAt: Date.now(),
+      seats: net.table.seats, state: st, rows: [], tally: tally, toss: t
+    });
+  }
+
+  function quitTable(silent) {
+    if (net.unsub) net.unsub();
+    if (net.unpeers) net.unpeers();
+    if (lobbyOff) { lobbyOff(); lobbyOff = null; }
+    net.unsub = net.unpeers = null;
+    net.code = net.seat = net.table = null;
+    net.peers = [];
+    net.shown = false;
+    NardyNet.leave();
+    try { localStorage.removeItem('nardy.net'); } catch (e) {}
+    opts.mode = 'ai';
+    save();
+    busy = true;
+    if (!silent) { S = null; VIS = visFrom(N.create()); buildMen(); place(true); rows = []; renderLog(); updateUI(); }
+    setupSheet();
+  }
+
+  /* ---------- диалоги ---------- */
+
+  var veil = $('veil'), sheet = $('sheet');
+
+  var sheetKind = '';
+
+  function openSheet(html) {
+    sheet.innerHTML = html;
+    sheet.dataset.kind = sheetKind || '';
+    sheetKind = '';
+    veil.classList.add('show');
+  }
+
+  function closeSheet() {
+    veil.classList.remove('show');
+    if (lobbyOff) { lobbyOff(); lobbyOff = null; }
+  }
+
+  function saveName() {
+    var f = $('net-name');
+    if (f) NardyNet.rename(f.value.trim());
+  }
+
+  function segHTML(key, items, val) {
+    return '<div class="seg" data-k="' + key + '">' + items.map(function (it) {
+      return '<button type="button" data-v="' + it[0] + '" aria-pressed="' +
+        (val === it[0]) + '">' + it[1] + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function setupSheet() {
+    openSheet(
+      '<h1>Длинные нарды</h1>' +
+      '<p class="lede">Пятнадцать шашек стоят на голове, идут по кругу в свой дом и уходят с доски. ' +
+      'Шашки не бьют — их запирают.</p>' +
+      '<div class="field"><label>Соперник</label>' +
+      segHTML('mode', [['ai', 'Компьютер'], ['duo', 'Вдвоём'], ['net', 'По сети']], opts.mode) +
+      '<p class="hint" id="net-hint"></p></div>' +
+      '<div class="field" id="f-level"><label>Уровень компьютера</label>' +
+      segHTML('level', [['easy', 'Новичок'], ['normal', 'Опытный'], ['hard', 'Мастер']], opts.level) + '</div>' +
+      '<div class="field" id="f-side"><label>Вы играете</label>' +
+      segHTML('human', [['w', 'белыми'], ['b', 'чёрными']], opts.human) + '</div>' +
+      '<div class="field"><label>Комментатор</label>' +
+      segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
+      '</div>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="rules">Правила</button>' +
+      (saved
+        ? '<button class="btn" type="button" data-act="start">Заново</button>' +
+          '<button class="btn btn-key" type="button" data-act="resume">Продолжить</button>'
+        : '<button class="btn btn-key" type="button" data-act="start">Начать партию</button>') +
+      '</div>'
+    );
+    syncSetup();
+  }
+
+  function syncSetup() {
+    var show = opts.mode === 'ai';
+    var fl = $('f-level'), fs = $('f-side');
+    if (fl) fl.style.display = show ? '' : 'none';
+    if (fs) fs.style.display = show ? '' : 'none';
+    var b = sheet.querySelector('.seg[data-k="mode"] [data-v="net"]');
+    var hint = $('net-hint');
+    if (b) b.disabled = net.ready === false;
+    if (hint) {
+      hint.textContent = net.ready === null ? 'Проверяем связь…'
+        : net.ready === false ? 'Игра по сети работает только в опубликованной версии страницы.'
+        : '';
+    }
+  }
+
+  /* ---------- сетевые диалоги ---------- */
+
+  function netSheet() {
+    if (net.code) { tableSheet(); return; }
+    openSheet(
+      '<h1>Игра по сети</h1>' +
+      '<p class="lede">Создайте стол и передайте сопернику код. Он откроет эту же ссылку, ' +
+      'введёт код — и вы играете с разных устройств.</p>' +
+      '<div class="field"><label>Как вас зовут</label>' +
+      '<input class="inp" id="net-name" maxlength="18" placeholder="Игрок" value="' +
+      esc(NardyNet.name()) + '"></div>' +
+      '<div class="field"><label>Вы играете</label>' +
+      segHTML('human', [['w', 'белыми'], ['b', 'чёрными']], opts.human) + '</div>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="back">Назад</button>' +
+      '<button class="btn btn-key" type="button" data-act="net-new">Создать стол</button></div>' +
+      (NardyNet.hasLobby()
+        ? '<div class="field gap"><label>Кто ждёт соперника</label>' +
+          '<ul class="tables" id="net-list"><li class="muted">смотрим…</li></ul></div>'
+        : '<div class="gap"></div>') +
+      '<div class="field"><label>Или код стола</label><div class="row">' +
+      '<input class="inp mono" id="net-code" maxlength="6" placeholder="КОД" ' +
+      'autocapitalize="characters" autocomplete="off" spellcheck="false">' +
+      '<button class="btn" type="button" data-act="net-join">Сесть</button></div></div>'
+    );
+    if (NardyNet.hasLobby()) watchLobby();
+  }
+
+  function watchLobby() {
+    if (lobbyOff) lobbyOff();
+    lobbyOff = NardyNet.watchLobby(function (list) {
+      var ul = $('net-list');
+      if (!ul) return;
+      var mineId = NardyNet.id();
+      list = list.filter(function (t) {
+        var w = t.seats && t.seats.w, b = t.seats && t.seats.b;
+        return !((w && w.id === mineId) || (b && b.id === mineId));
+      });
+      if (!list.length) {
+        ul.innerHTML = '<li class="muted">Пока никто не ждёт. Создайте стол — соперник увидит его здесь.</li>';
+        return;
+      }
+      ul.innerHTML = list.map(function (t) {
+        var host = (t.seats.w || t.seats.b || {}).name || 'Игрок';
+        var side = t.seats.w ? 'чёрными' : 'белыми';
+        return '<li><b class="mono">' + esc(t.code) + '</b>' +
+          '<span>' + esc(host) + ' ждёт · сядете ' + side + '</span>' +
+          '<button class="btn" type="button" data-act="net-sit" data-code="' + esc(t.code) + '">Сесть</button></li>';
+      }).join('');
+    }, function () {
+      var ul = $('net-list');
+      if (ul) ul.innerHTML = '<li class="muted">Список столов недоступен</li>';
+    });
+  }
+
+  function inviteSheet(code) {
+    openSheet(
+      '<h1>Вас зовут за стол</h1>' +
+      '<p class="lede">Кто-то ждёт соперника. Представьтесь — и садитесь играть.</p>' +
+      '<div class="code-big mono">' + esc(code) + '</div>' +
+      '<div class="field"><label>Как вас зовут</label>' +
+      '<input class="inp" id="net-name" maxlength="18" placeholder="Игрок" value="' +
+      esc(NardyNet.name()) + '"></div>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="back">Не сейчас</button>' +
+      '<button class="btn btn-key" type="button" data-act="net-sit" data-code="' + esc(code) + '">Сесть за стол</button>' +
+      '</div>'
+    );
+  }
+
+  function tableSheet() {
+    var t = net.table || {}, waiting = t.status === 'open';
+    sheetKind = 'table';
+    var opp = t.seats ? t.seats[N.opp(net.seat)] : null;
+    openSheet(
+      '<h1>Стол ' + esc(net.code) + '</h1>' +
+      '<p class="lede">' + (waiting
+        ? 'Передайте код сопернику — он откроет эту же ссылку, введёт код и сядет напротив.'
+        : 'Напротив ' + esc((opp && opp.name) || 'соперник') + '. Ходите по очереди, доска у обоих одна.') +
+      '</p>' +
+      '<div class="code-big mono">' + esc(net.code) + '</div>' +
+      '<p class="hint" style="text-align:center">' +
+      (waiting ? 'Ждём соперника…' : 'Вы играете ' + (net.seat === 'w' ? 'белыми' : 'чёрными')) + '</p>' +
+      '<div class="field"><label>Ссылка-приглашение</label><div class="row">' +
+      '<input class="inp" id="net-link" readonly value="' + esc(shareLink()) + '">' +
+      '<button class="btn" type="button" data-act="net-copy">Копировать</button></div>' +
+      '<p class="hint">По ней соперник попадёт прямо за этот стол.</p></div>' +
+      '<div class="field"><label>Комментатор</label>' +
+      segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
+      '</div>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="net-quit">Покинуть стол</button>' +
+      '<button class="btn btn-key" type="button" data-act="close">К доске</button></div>'
+    );
+  }
+
+  function rulesSheet() {
+    openSheet(
+      '<h1>Правила</h1>' +
+      '<div class="rules">' +
+      '<p>Длинные нарды. У каждого 15 шашек, они стоят на своей <b>голове</b> — в противоположных углах доски. ' +
+      'Оба идут по кругу в одну сторону, к своему <b>дому</b> — последней четверти пути.</p>' +
+      '<h3>Ход</h3><p>Бросают две кости и двигают шашки на выпавшее число пунктов: две разные шашки или одну дважды. ' +
+      'При <b>дубле</b> кости играются четыре раза. Разыграть нужно как можно больше костей; если проходит только одна — играется старшая.</p>' +
+      '<h3>Голова</h3><p>За ход с головы снимается <b>одна</b> шашка. Исключение — первый ход при 6-6, 4-4 или 3-3: тогда две.</p>' +
+      '<h3>Куда нельзя</h3><p>Занять можно только пустой пункт или свой. Пункт, где стоит хотя бы одна чужая шашка, закрыт. ' +
+      'Шашки в этой игре не бьют.</p>' +
+      '<h3>Правило шести</h3><p>Нельзя выстроить шесть своих пунктов подряд, если все 15 шашек соперника окажутся заперты позади. ' +
+      'Хотя бы одна чужая шашка должна быть впереди блока.</p>' +
+      '<h3>Выход</h3><p>Когда все 15 шашек собраны в доме, их снимают с доски. Точное число снимает шашку с этого пункта; ' +
+      'большее — только с самой дальней. Кто снял все шашки первым, выиграл. Если соперник не снял ни одной — это <b>марс</b>, две партии.</p>' +
+      '</div>' +
+      '<div class="sheet-actions"><button class="btn btn-key" type="button" data-act="close">Понятно</button></div>'
+    );
+  }
+
+  function finish(bump) {
+    busy = true;
+    forget();
+    sel = null;
+    net.shown = true;
+    renderSpots();
+    markLive();
+    var w = S.winner, l = N.opp(w);
+    var mars = S.off[l] === 0;
+    quip(mars ? 'mars' : 'win', w, true);
+    if (bump !== false) {
+      tally[w] += mars ? 2 : 1;
+      save();
+      if (isNet()) pushTable({ status: 'done' });
+    }
+    updateUI();
+    sfx('win');
+    later(900, function () {
+      sheetKind = 'result';
+      var who = isNet()
+        ? (net.seat === w ? 'Вы победили' : nameOf(w) + ' победили')
+        : nameOf(w) + ' победили';
+      openSheet(
+        '<div class="crown"><span class="disc ' + w + '"></span></div>' +
+        '<h1 style="text-align:center">' + who + '</h1>' +
+        '<p class="lede" style="text-align:center;margin-inline:auto">' +
+        (mars ? 'Марс — соперник не снял ни одной шашки. Два очка.' : 'Партия закрыта. Одно очко.') +
+        '<br>Счёт матча ' + tally.w + ' : ' + tally.b + '.</p>' +
+        '<div class="sheet-actions">' +
+        (isNet()
+          ? '<button class="btn" type="button" data-act="net-quit">Покинуть стол</button>'
+          : '<button class="btn" type="button" data-act="reset">Сбросить счёт</button>') +
+        '<button class="btn btn-key" type="button" data-act="again">Ещё партию</button></div>'
+      );
+    });
+  }
+
+  /* ---------- запуск партии ---------- */
+
+  /* Возврат к сохранённой партии с того места, где её оставили */
+  function resume() {
+    if (!saved) { newGame(); return; }
+    closeSheet();
+    S = saved.s;
+    rows = saved.rows || [];
+    VIS = visFrom(S);
+    undoStack = [];
+    sel = null;
+    busy = true;
+    buildMen();
+    place(true);
+    renderLog();
+    updateUI();
+    if (!S.dice.length) { beginTurn(); return; }
+    renderDice(false);
+    legal = N.legalMoves(S);
+    if (!legal.length) { setTimeout(passTurn, 900); return; }
+    if (isAI(S.turn)) setTimeout(aiTurn, 600);
+    else { busy = false; markLive(); updateUI(); }
+  }
+
+  function newGame() {
+    closeSheet();
+    hushQuip();
+    banterHead = false;
+    forget();
+    S = N.create();
+    VIS = visFrom(S);
+    rows = [];
+    undoStack = [];
+    sel = null;
+    legal = [];
+    buildMen();
+    place(true);
+    renderLog();
+    updateUI();
+    opening();
+  }
+
+  function opening() {
+    busy = true;
+    var a, b;
+    do { a = N.rollDie(); b = N.rollDie(); } while (a === b);
+    S.turn = a > b ? 'w' : 'b';
+    renderOpeningDice(a, b);
+    sfx('dice');
+    toast('Жеребьёвка: ' + a + ' — ' + b + '. Первыми ходят ' +
+      (S.turn === 'w' ? 'белые' : 'чёрные'), 1600);
+    setTimeout(beginTurn, 1700);
+  }
+
+  /* ---------- события ---------- */
+
+  lZones.addEventListener('pointerdown', onDown);
+  lZones.addEventListener('pointermove', onMove);
+  lZones.addEventListener('pointerup', onUp);
+  lZones.addEventListener('pointercancel', onCancel);
+  lSpots.addEventListener('pointerdown', onDown);
+
+  $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : setupSheet(); });
+  $('act-rules').addEventListener('click', rulesSheet);
+  $('act-undo').addEventListener('click', function () { undo(); });
+  $('act-hint').addEventListener('click', hint);
+  $('act-sound').addEventListener('click', function () {
+    opts.sound = !opts.sound;
+    save();
+    if (opts.sound) sfx('move');
+    updateUI();
+  });
+
+  veil.addEventListener('click', function (e) {
+    if (e.target === veil) { if (S) closeSheet(); return; }
+    var seg = e.target.closest('.seg');
+    if (seg && e.target.tagName === 'BUTTON') {
+      opts[seg.dataset.k] = e.target.dataset.v;
+      Array.prototype.forEach.call(seg.children, function (b) {
+        b.setAttribute('aria-pressed', String(b === e.target));
+      });
+      save();
+      if (seg.dataset.k === 'mode' && opts.mode === 'net') { netSheet(); return; }
+      syncSetup();
+      return;
+    }
+    var act = e.target.dataset ? e.target.dataset.act : null;
+    if (act === 'start') newGame();
+    else if (act === 'again') { isNet() ? rematch() : newGame(); }
+    else if (act === 'resume') resume();
+    else if (act === 'net-new') { saveName(); createTable(); }
+    else if (act === 'net-sit') { saveName(); sitDown(e.target.dataset.code); }
+    else if (act === 'net-join') { saveName(); sitDown($('net-code') ? $('net-code').value : ''); }
+    else if (act === 'net-quit') quitTable();
+    else if (act === 'net-copy') {
+      var f = $('net-link');
+      if (f) {
+        f.select();
+        var done = function () { toast('Ссылка скопирована'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(f.value).then(done, function () { toast('Скопируйте ссылку вручную'); });
+        } else {
+          try { document.execCommand('copy'); done(); } catch (err) { toast('Скопируйте ссылку вручную'); }
+        }
+      }
+    }
+    else if (act === 'back') { opts.mode = 'ai'; save(); setupSheet(); }
+    else if (act === 'rules') rulesSheet();
+    else if (act === 'close') { if (S) closeSheet(); else setupSheet(); }
+    else if (act === 'reset') { tally = { w: 0, b: 0 }; save(); updateUI(); newGame(); }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && veil.classList.contains('show') && S) closeSheet();
+    if (e.key === 'z' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (!$('act-undo').disabled) undo(); }
+  });
+
+  var rt;
+  function onResize() {
+    B.render(scene);
+    if (VIS) place(true);
+  }
+  window.addEventListener('resize', function () {
+    clearTimeout(rt);
+    rt = setTimeout(onResize, 120);
+  });
+
+  /* ---------- старт ---------- */
+
+  window.NardyDebug = function () {
+    return { mode: opts.mode, code: net.code, seat: net.seat, ready: net.ready,
+             hasTable: !!net.table, hasS: !!S, busy: busy, legal: legal.length,
+             isNet: isNet(), status: net.table && net.table.status };
+  };
+
+  buildZones();
+  B.render(scene);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { B.render(scene); });
+  }
+  S = null;
+  VIS = visFrom(saved ? saved.s : N.create());
+  buildMen();
+  place(true);
+  updateUI();
+  setupSheet();
+
+  /* Сеть подключается отдельно: страница обязана работать и без неё */
+  NardyNet.connect().then(function (db) {
+    net.ready = !!db;
+    syncSetup();
+    if (!db) {
+      if (opts.mode === 'net') { opts.mode = 'ai'; save(); setupSheet(); }
+      return;
+    }
+    var invite = readInvite();
+    if (invite) {
+      forgetInvite();
+      opts.mode = 'net';
+      save();
+      inviteSheet(invite);
+      return;
+    }
+    var back = null;
+    try { back = JSON.parse(localStorage.getItem('nardy.net') || 'null'); } catch (e) {}
+    if (!back || !back.code) {
+      if (opts.mode === 'net') netSheet();
+      return;
+    }
+    NardyNet.peek(back.code).then(function (t) {
+      var seat = t && t.seats && t.seats[back.seat];
+      if (!seat || seat.id !== NardyNet.id()) {
+        try { localStorage.removeItem('nardy.net'); } catch (e) {}
+        if (opts.mode === 'net') { opts.mode = 'ai'; save(); setupSheet(); }
+        return;
+      }
+      net.seat = back.seat;
+      net.table = t;
+      tally = t.tally || tally;
+      S = null;
+      rows = [];
+      closeSheet();
+      openTable(back.code);
+    }, function () {});
+  });
+})();
+</script>
