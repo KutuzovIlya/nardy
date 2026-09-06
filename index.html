@@ -2,13 +2,15 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0F1218">
 <title>Длинные нарды</title>
-<meta name="description" content="Длинные нарды: партия против компьютера или вдвоём за одним экраном.">
+<meta name="description" content="Длинные нарды: партия против компьютера или вдвоём по сети.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Forum&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=6">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 <div class="app">
@@ -18,56 +20,23 @@
 
     <div class="tally">
       <span class="chip" id="net-chip" hidden></span>
-      <span>счёт</span>
       <b id="tally-w">0</b>
       <span>:</span>
       <b id="tally-b">0</b>
     </div>
 
     <nav class="rail-actions">
-      <button class="btn" id="act-hint" type="button" title="Показать сильный ход"><span class="wide">Подсказка</span><span class="tight">Совет</span></button>
-      <button class="btn" id="act-undo" type="button" title="Вернуть последнюю шашку"><span class="wide">Отменить</span><span class="tight">Назад</span></button>
-      <button class="btn" id="act-rules" type="button">Правила</button>
+      <button class="btn btn-icon" id="act-hint" type="button" title="Подсказка" aria-label="Подсказка">?</button>
+      <button class="btn btn-icon" id="act-undo" type="button" title="Отменить ход" aria-label="Отменить ход">↶</button>
       <button class="btn btn-icon" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
-      <button class="btn btn-key" id="act-new" type="button"><span class="wide">Новая партия</span><span class="tight">Новая</span></button>
+      <button class="btn btn-key" id="act-new" type="button">Партия</button>
     </nav>
   </header>
 
   <main class="table">
-   <div class="stage" id="stage">
-    <div class="board" id="board">
-      <canvas id="scene"></canvas>
-      <div class="layer hit" id="zones"></div>
-      <div class="layer" id="men"></div>
-      <div class="layer" id="spots"></div>
-      <div class="layer" id="dice"></div>
-    </div>
-    <div class="quip" id="quip"></div>
-    <div class="toast" id="toast"></div>
-   </div>
-  </main>
-
-  <section class="panels">
-    <div class="plaque" id="pl-w">
-      <span class="disc w"></span>
-      <div>
-        <div class="pname">Белые</div>
-        <div class="pmeta" id="meta-w">Игрок</div>
-      </div>
-      <div class="pstats">
-        <div><b id="pip-w">360</b><span>пипсы</span></div>
-        <div><b id="off-w">0</b><span>снято</span></div>
-      </div>
-    </div>
-
-    <div class="log">
-      <h2>Ход за ходом</h2>
-      <ol id="log"></ol>
-    </div>
-
     <div class="plaque" id="pl-b">
       <span class="disc b"></span>
-      <div>
+      <div class="pwho">
         <div class="pname">Чёрные</div>
         <div class="pmeta" id="meta-b">Компьютер</div>
       </div>
@@ -76,6 +45,35 @@
         <div><b id="off-b">0</b><span>снято</span></div>
       </div>
     </div>
+
+    <div class="stage" id="stage">
+      <div class="board" id="board">
+        <canvas id="scene"></canvas>
+        <div class="layer hit" id="zones"></div>
+        <div class="layer" id="men"></div>
+        <div class="layer" id="spots"></div>
+        <div class="layer" id="dice"></div>
+      </div>
+      <div class="quip" id="quip"></div>
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <div class="plaque" id="pl-w">
+      <span class="disc w"></span>
+      <div class="pwho">
+        <div class="pname">Белые</div>
+        <div class="pmeta" id="meta-w">Игрок</div>
+      </div>
+      <div class="pstats">
+        <div><b id="pip-w">360</b><span>пипсы</span></div>
+        <div><b id="off-w">0</b><span>снято</span></div>
+      </div>
+    </div>
+  </main>
+
+  <section class="log">
+    <h2>Ход за ходом</h2>
+    <ol id="log"></ol>
   </section>
 
 </div>
@@ -84,12 +82,13 @@
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Меню"></div>
 </div>
 
-<script src="js/mock-db.js?v=3"></script>
-<script src="js/engine.js?v=3"></script>
-<script src="js/ai.js?v=3"></script>
-<script src="js/board.js?v=3"></script>
-<script src="js/banter.js?v=3"></script>
-<script src="js/net.js?v=3"></script>
-<script src="js/ui.js?v=3"></script>
+<script src="js/mock-db.js?v=6"></script>
+<script src="js/engine.js?v=6"></script>
+<script src="js/ai.js?v=6"></script>
+<script src="js/board.js?v=6"></script>
+<script src="js/banter.js?v=6"></script>
+<script src="js/tg.js?v=6"></script>
+<script src="js/net.js?v=6"></script>
+<script src="js/ui.js?v=6"></script>
 </body>
 </html>

@@ -1,65 +1,31 @@
+<meta name="theme-color" content="#0F1218">
 <title>Длинные нарды</title>
-<meta name="description" content="Длинные нарды: партия против компьютера или вдвоём за одним экраном.">
+<meta name="description" content="Длинные нарды: партия против компьютера или вдвоём по сети.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Forum&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* ============================================================
-   Нарды — оформление
-   Палитра: ореховая доска с латунной инкрустацией на тёмном
-   столе. Акцент — латунь, всё остальное приглушено.
+   Нарды. Свёрстано под телефон: экран делится на три полосы —
+   соперник сверху, доска посередине во всю оставшуюся высоту,
+   вы снизу. На большом экране раскладка та же, просто шире.
    ============================================================ */
 
 :root {
-  --bg:        #EFE8DA;
-  --bg-deep:   #E0D5C0;
-  --panel:     #FAF6EE;
-  --panel-2:   #F2EADA;
-  --line:      rgba(74, 56, 32, .18);
-  --line-soft: rgba(74, 56, 32, .10);
-  --text:      #2B2318;
-  --text-dim:  #6E6050;
-  --brass:     #8A6716;
-  --brass-lit: #B08A2E;
-  --felt:      #14514A;
-  --oxblood:   #7B2E26;
-  --shadow-lg: 0 30px 70px -30px rgba(40, 28, 12, .45);
-  --shadow-sm: 0 2px 10px rgba(40, 28, 12, .14);
-  --radius:    14px;
-  --move-dur:  380ms;
-  --ease:      cubic-bezier(.22, .68, .36, 1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg:        #10131A;
-    --bg-deep:   #070910;
-    --panel:     #181C25;
-    --panel-2:   #1F242F;
-    --line:      rgba(200, 162, 74, .18);
-    --line-soft: rgba(200, 162, 74, .09);
-    --text:      #EBE3D3;
-    --text-dim:  #968D7C;
-    --brass:     #C8A24A;
-    --brass-lit: #E5C97F;
-    --shadow-lg: 0 40px 90px -35px rgba(0, 0, 0, .9);
-    --shadow-sm: 0 2px 12px rgba(0, 0, 0, .5);
-  }
-}
-
-:root[data-theme="dark"] {
-  --bg:        #10131A;
-  --bg-deep:   #070910;
-  --panel:     #181C25;
+  --bg:        #0F1218;
+  --bg-deep:   #06080D;
+  --panel:     #171B24;
   --panel-2:   #1F242F;
   --line:      rgba(200, 162, 74, .18);
-  --line-soft: rgba(200, 162, 74, .09);
   --text:      #EBE3D3;
   --text-dim:  #968D7C;
   --brass:     #C8A24A;
   --brass-lit: #E5C97F;
   --shadow-lg: 0 40px 90px -35px rgba(0, 0, 0, .9);
-  --shadow-sm: 0 2px 12px rgba(0, 0, 0, .5);
+  --radius:    14px;
+  --move-dur:  360ms;
+  --ease:      cubic-bezier(.22, .68, .36, 1);
+  --gap:       10px;
 }
 
 * { box-sizing: border-box; }
@@ -68,16 +34,16 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
-  overflow-x: hidden;
-  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
   background: var(--bg);
-  background-image: radial-gradient(120% 90% at 50% -10%, var(--bg) 0%, var(--bg-deep) 100%);
-  background-attachment: fixed;
+  background-image: radial-gradient(120% 80% at 50% 0%, #161B24 0%, var(--bg-deep) 100%);
   color: var(--text);
   font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 button { font: inherit; color: inherit; }
@@ -85,15 +51,22 @@ button { font: inherit; color: inherit; }
 /* ---------- каркас ---------- */
 
 .app {
-  min-height: 100%;
-  user-select: none;
-  -webkit-user-select: none;
-  max-width: 1180px;
+  height: 100dvh;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 18px 20px 40px;
+  padding: calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right))
+           calc(8px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--gap);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* внутри Telegram шапку рисует сам мессенджер, а высоту окна он же и сообщает */
+.tg .app {
+  padding-top: 6px;
+  height: var(--tgh, 100dvh);
 }
 
 /* ---------- верхняя планка ---------- */
@@ -101,28 +74,26 @@ button { font: inherit; color: inherit; }
 .rail {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+  gap: 8px;
+  flex: none;
 }
 
 .mark {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   font-family: Forum, Georgia, serif;
-  font-size: 30px;
-  letter-spacing: .16em;
+  font-size: 20px;
+  letter-spacing: .14em;
   text-transform: uppercase;
   line-height: 1;
-  color: var(--text);
 }
 
 .mark em {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-style: normal;
-  font-size: 10px;
-  letter-spacing: .3em;
+  font-size: 9px;
+  letter-spacing: .28em;
   text-transform: uppercase;
   color: var(--brass);
 }
@@ -131,39 +102,27 @@ button { font: inherit; color: inherit; }
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 7px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
-.tally b {
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.tally span {
-  font-size: 10px;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-}
+.tally b { font-size: 16px; font-weight: 500; color: var(--text); }
 
 .chip {
-  padding: 3px 10px;
+  padding: 3px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 11px !important;
-  letter-spacing: .12em !important;
+  font-size: 10px;
+  letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--brass) !important;
+  color: var(--brass);
   white-space: nowrap;
 }
 
-.rail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-
-.btn .tight { display: none; }
+.rail-actions { display: flex; gap: 6px; }
 
 /* ---------- кнопки ---------- */
 
@@ -172,20 +131,26 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 999px;
-  padding: 8px 15px;
+  padding: 8px 14px;
   font-size: 13px;
-  letter-spacing: .02em;
   cursor: pointer;
-  transition: border-color .18s, background .18s, transform .18s, color .18s;
   white-space: nowrap;
+  transition: border-color .18s, background .18s, transform .12s, color .18s, opacity .18s;
 }
 
-.btn:hover:not(:disabled) { border-color: var(--brass); color: var(--brass-lit); }
-.btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: .38; cursor: default; }
+.btn:active:not(:disabled) { transform: scale(.96); }
+.btn:disabled { opacity: .32; }
 .btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
-.btn-icon { padding: 8px 11px; }
+.btn-icon {
+  width: 38px;
+  padding: 0;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+}
 
 .btn-key {
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
@@ -194,21 +159,35 @@ button { font: inherit; color: inherit; }
   font-weight: 500;
 }
 
-.btn-key:hover:not(:disabled) { color: #14100A; filter: brightness(1.08); }
+@media (hover: hover) {
+  .btn:hover:not(:disabled) { border-color: var(--brass); color: var(--brass-lit); }
+  .btn-key:hover:not(:disabled) { color: #14100A; filter: brightness(1.08); }
+}
 
-/* ---------- доска ---------- */
+/* ---------- стол ---------- */
 
-.table { position: relative; }
+.table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
 
-.stage { position: relative; }
+.stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .board {
   position: relative;
-  width: 100%;
-  aspect-ratio: 1240 / 820;
-  border-radius: 18px;
+  border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  touch-action: manipulation;
+  touch-action: none;
 }
 
 .board canvas {
@@ -216,55 +195,37 @@ button { font: inherit; color: inherit; }
   inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 18px;
+  border-radius: 16px;
   display: block;
 }
 
-.layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
+.layer { position: absolute; inset: 0; pointer-events: none; }
 .layer.hit { pointer-events: auto; }
 
-/* пункты — прозрачные зоны нажатия */
-.zone {
-  position: absolute;
-  cursor: default;
-  border-radius: 4px;
-}
+.zone { position: absolute; border-radius: 4px; }
 
-.zone.live {
-  cursor: pointer;
-  touch-action: none;
-}
+.zone.live { cursor: pointer; }
 
-/* доступный пункт слегка светится у основания */
 .zone.live::after {
   content: "";
   position: absolute;
-  left: 8%;
-  right: 8%;
-  height: 26%;
+  inset: 14%;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(200, 162, 74, .30), transparent 70%);
+  background: radial-gradient(circle, rgba(200, 162, 74, .34), transparent 70%);
   opacity: 0;
   transition: opacity .2s;
 }
 
-.zone.live[data-row="top"]::after { top: -4%; }
-.zone.live[data-row="bottom"]::after { bottom: -4%; }
-.zone.live:hover::after { opacity: 1; }
-
-.spot { touch-action: none; }
-
-.zone.tray::after { display: none; }
+@media (hover: hover) {
+  .zone.live:hover::after { opacity: 1; }
+}
 
 .zone.tray.live {
   box-shadow: inset 0 0 0 2px rgba(200, 162, 74, .45), inset 0 0 26px rgba(200, 162, 74, .25);
   border-radius: 9px;
 }
+
+.zone.tray::after { display: none; }
 
 /* ---------- шашки ---------- */
 
@@ -275,69 +236,34 @@ button { font: inherit; color: inherit; }
   width: var(--cd);
   height: var(--cd);
   border-radius: 50%;
+  background-size: 100% 100%;
   will-change: transform;
   transition: transform var(--move-dur) var(--ease), filter .2s ease;
   z-index: 1;
+  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .6));
 }
 
-.man::after {
+.man.pick { z-index: 6; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .7)) brightness(1.08); }
+
+.man.pick::before,
+.man.hint::before {
   content: "";
   position: absolute;
-  inset: 21%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, .28), rgba(0, 0, 0, .12) 70%);
-}
-
-.man.w {
-  background:
-    radial-gradient(circle at 34% 27%, #FFFAEE 0%, #EDDFC0 38%, #D3BE95 72%, #A78F63 100%);
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 253, 245, .55),
-    inset 0 -7px 14px rgba(122, 96, 55, .38),
-    0 7px 16px -4px rgba(0, 0, 0, .62);
-}
-
-.man.w::after { box-shadow: inset 0 0 0 1.5px rgba(140, 112, 66, .35); }
-
-.man.b {
-  background:
-    radial-gradient(circle at 34% 27%, #5A5045 0%, #3A312A 38%, #211B17 72%, #0D0A08 100%);
-  box-shadow:
-    inset 0 0 0 2px rgba(200, 162, 74, .30),
-    inset 0 -7px 14px rgba(0, 0, 0, .55),
-    0 6px 14px -4px rgba(0, 0, 0, .65);
-}
-
-.man.b::after { box-shadow: inset 0 0 0 1.5px rgba(200, 162, 74, .22); }
-
-.man.pick { filter: brightness(1.1); z-index: 6; }
-
-.man.pick::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
+  inset: -6%;
   border-radius: 50%;
   border: 2px solid var(--brass);
   box-shadow: 0 0 18px rgba(200, 162, 74, .55);
 }
 
-.man.hint::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 2px dashed var(--brass-lit);
-  animation: breathe 1.4s ease-in-out infinite;
-}
+.man.hint::before { border-style: dashed; animation: breathe 1.4s ease-in-out infinite; }
 
 .man.land { animation: land .34s var(--ease); }
 
 @keyframes land {
-  0%   { filter: brightness(1.4); }
-  100% { filter: brightness(1); }
+  0% { filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .6)) brightness(1.45); }
+  100% { filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .6)) brightness(1); }
 }
 
-/* счётчик на высокой стопке */
 .tag {
   position: absolute;
   left: 0;
@@ -346,20 +272,17 @@ button { font: inherit; color: inherit; }
   text-align: center;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: calc(var(--cd) * .34);
-  line-height: 1;
   font-weight: 500;
+  line-height: 1;
   color: #4B3517;
   text-shadow: 0 1px 2px rgba(255, 250, 235, .55);
   z-index: 20;
   pointer-events: none;
 }
 
-.tag.on-dark {
-  color: #F1E3BE;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
-}
+.tag.on-dark { color: #F1E3BE; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
 
-/* ---------- метки возможных ходов ---------- */
+/* ---------- метки хода ---------- */
 
 .spot {
   position: absolute;
@@ -369,12 +292,13 @@ button { font: inherit; color: inherit; }
   height: var(--cd);
   border-radius: 50%;
   border: 2px solid var(--brass);
-  background: radial-gradient(circle, rgba(200, 162, 74, .22), rgba(200, 162, 74, .04) 70%);
+  background: radial-gradient(circle, rgba(200, 162, 74, .24), rgba(200, 162, 74, .04) 70%);
   box-shadow: 0 0 22px rgba(200, 162, 74, .35);
   animation: breathe 1.6s ease-in-out infinite;
   z-index: 4;
   cursor: pointer;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .spot em {
@@ -407,36 +331,12 @@ button { font: inherit; color: inherit; }
 .die {
   position: absolute;
   inset: 0;
-  border-radius: calc(var(--dd) * .22);
-  background: linear-gradient(155deg, #FDF6E6 0%, #EADCBD 55%, #CBB68C 100%);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, .9),
-    inset 0 -4px 8px rgba(120, 96, 56, .35),
-    0 10px 20px -8px rgba(0, 0, 0, .7);
+  background-size: 100% 100%;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .65));
   transition: opacity .3s, transform .3s;
 }
 
-.die.dark {
-  background: linear-gradient(155deg, #4C4239 0%, #2B241E 55%, #14100D 100%);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, .16),
-    inset 0 -4px 8px rgba(0, 0, 0, .6),
-    0 10px 20px -8px rgba(0, 0, 0, .8);
-}
-
-.die i {
-  position: absolute;
-  width: 17%;
-  height: 17%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #6A5B45, #2A2119);
-  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, .5);
-}
-
-.die.dark i { background: radial-gradient(circle at 35% 30%, #E8D9B4, #B49A63); }
-
-.die.used { opacity: .45; transform: scale(.88); filter: saturate(.6); }
-
+.die.used { opacity: .4; transform: scale(.86); }
 .die.tumble { animation: tumble .58s var(--ease); }
 
 @keyframes tumble {
@@ -446,71 +346,56 @@ button { font: inherit; color: inherit; }
   100% { transform: translateY(0) rotate(0) scale(1); }
 }
 
-/* ---------- сообщение над доской ---------- */
+/* ---------- реплики и сообщения ---------- */
 
-.quip {
+.quip, .toast {
   position: absolute;
   left: 50%;
-  top: 4%;
   transform: translate(-50%, 8px);
-  max-width: min(88%, 34rem);
-  padding: 10px 22px;
-  border-radius: 999px;
-  background: rgba(12, 9, 6, .8);
-  border: 1px solid rgba(200, 162, 74, .34);
-  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
-  font-family: Forum, Georgia, serif;
-  font-size: clamp(15px, 2.2vw, 21px);
-  letter-spacing: .02em;
-  color: #F2E4C2;
-  text-align: center;
-  text-wrap: balance;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .28s, transform .28s var(--ease);
-  z-index: 21;
-}
-
-.quip.show { opacity: 1; transform: translate(-50%, 0); }
-
-.toast {
-  position: absolute;
-  left: 50%;
-  bottom: 6%;
-  transform: translate(-50%, 10px);
-  padding: 9px 18px;
-  border-radius: 999px;
-  background: rgba(10, 8, 6, .84);
-  border: 1px solid rgba(200, 162, 74, .38);
-  color: #F0E6D2;
-  font-size: 13px;
-  letter-spacing: .02em;
   max-width: min(92%, 30rem);
   text-align: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .25s, transform .25s;
-  z-index: 20;
+  z-index: 21;
+  transition: opacity .28s, transform .28s var(--ease);
+}
+
+.quip {
+  top: 2%;
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: rgba(12, 9, 6, .84);
+  border: 1px solid rgba(200, 162, 74, .34);
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
+  font-family: Forum, Georgia, serif;
+  font-size: clamp(15px, 4vw, 20px);
+  color: #F2E4C2;
+  text-wrap: balance;
+  backdrop-filter: blur(4px);
+}
+
+.toast {
+  bottom: 3%;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(10, 8, 6, .86);
+  border: 1px solid rgba(200, 162, 74, .3);
+  color: #F0E6D2;
+  font-size: 13px;
   backdrop-filter: blur(6px);
 }
 
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.quip.show, .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* ---------- нижние панели ---------- */
-
-.panels {
-  display: grid;
-  grid-template-columns: 1fr 1.1fr 1fr;
-  gap: 14px;
-  align-items: start;
-}
+/* ---------- таблички игроков ---------- */
 
 .plaque {
   position: relative;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 15px;
+  gap: 10px;
+  padding: 9px 13px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -534,20 +419,14 @@ button { font: inherit; color: inherit; }
 .plaque.act { border-color: color-mix(in srgb, var(--brass) 55%, transparent); background: var(--panel-2); }
 .plaque.act::before { transform: scaleX(1); }
 
-.disc {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  flex: none;
-}
+.disc { width: 26px; height: 26px; border-radius: 50%; flex: none; background-size: 100% 100%; }
 
-.disc.w { background: radial-gradient(circle at 34% 28%, #FFFAEE, #E0D0AE 60%, #AC9469); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .5), 0 2px 6px rgba(0, 0, 0, .35); }
-.disc.b { background: radial-gradient(circle at 34% 28%, #574D42, #241E19 60%, #100C09); box-shadow: inset 0 0 0 1.5px rgba(200, 162, 74, .3), 0 2px 6px rgba(0, 0, 0, .45); }
+.pwho { min-width: 0; }
 
 .pname {
   font-family: Forum, Georgia, serif;
-  font-size: 19px;
-  letter-spacing: .08em;
+  font-size: 17px;
+  letter-spacing: .07em;
   text-transform: uppercase;
   line-height: 1.15;
 }
@@ -555,49 +434,46 @@ button { font: inherit; color: inherit; }
 .pmeta {
   font-size: 11px;
   color: var(--text-dim);
-  letter-spacing: .04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.pstats {
-  margin-left: auto;
-  display: flex;
-  gap: 14px;
-  text-align: right;
-}
-
+.pstats { margin-left: auto; display: flex; gap: 13px; text-align: right; }
 .pstats div { display: flex; flex-direction: column; }
 
 .pstats b {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 500;
   line-height: 1.1;
 }
 
 .pstats span {
-  font-size: 9px;
-  letter-spacing: .18em;
+  font-size: 8px;
+  letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
 
-/* журнал ходов */
+/* ---------- журнал ---------- */
 
 .log {
+  flex: none;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
-  padding: 10px 4px 10px 14px;
-  min-height: 84px;
+  padding: 9px 4px 9px 13px;
+  display: none;
 }
 
 .log h2 {
-  margin: 0 0 6px;
+  margin: 0 0 5px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 9px;
   font-weight: 500;
-  letter-spacing: .26em;
+  letter-spacing: .24em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
@@ -606,10 +482,8 @@ button { font: inherit; color: inherit; }
   margin: 0;
   padding: 0 10px 0 0;
   list-style: none;
-  max-height: 102px;
+  max-height: 84px;
   overflow-y: auto;
-  mask-image: linear-gradient(to top, transparent, #000 20px);
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
   display: flex;
   flex-direction: column-reverse;
   gap: 3px;
@@ -617,42 +491,49 @@ button { font: inherit; color: inherit; }
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
 }
 
 .log li { display: flex; gap: 8px; }
 .log li b { font-weight: 500; color: var(--text); min-width: 52px; }
-.log li.w b { color: var(--text); }
 .log li.b b { color: var(--brass); }
 
-/* ---------- модальное окно ---------- */
+/* журнал показываем там, где для него есть место */
+@media (min-height: 780px) and (min-width: 620px) {
+  .log { display: block; }
+}
+
+/* ---------- диалоги ---------- */
 
 .veil {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 24px;
-  background: color-mix(in srgb, var(--bg-deep) 78%, transparent);
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  background: rgba(6, 8, 13, .76);
   backdrop-filter: blur(10px) saturate(.9);
   z-index: 60;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .35s;
+  transition: opacity .3s;
 }
 
 .veil.show { opacity: 1; pointer-events: auto; }
 
 .sheet {
-  width: min(480px, 100%);
-  max-height: 88vh;
+  width: min(460px, 100%);
+  max-height: 100%;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--panel);
   box-shadow: var(--shadow-lg);
-  padding: 26px 28px 24px;
+  padding: 22px 20px 20px;
   transform: translateY(12px) scale(.98);
-  transition: transform .35s var(--ease);
+  transition: transform .3s var(--ease);
 }
 
 .veil.show .sheet { transform: none; }
@@ -660,28 +541,23 @@ button { font: inherit; color: inherit; }
 .sheet h1 {
   margin: 0 0 4px;
   font-family: Forum, Georgia, serif;
-  font-size: 34px;
+  font-size: 27px;
   font-weight: 400;
-  letter-spacing: .12em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   text-wrap: balance;
 }
 
-.sheet .lede {
-  margin: 0 0 22px;
-  color: var(--text-dim);
-  font-size: 13px;
-  max-width: 46ch;
-}
+.sheet .lede { margin: 0 0 18px; color: var(--text-dim); font-size: 13px; }
 
-.field { margin-bottom: 18px; }
+.field { margin-bottom: 16px; }
 
 .field > label {
   display: block;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 9px;
-  letter-spacing: .26em;
+  letter-spacing: .24em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
@@ -702,32 +578,30 @@ button { font: inherit; color: inherit; }
   border: 0;
   background: transparent;
   border-radius: 999px;
-  padding: 8px 6px;
+  padding: 9px 4px;
   font-size: 13px;
   cursor: pointer;
   color: var(--text-dim);
   transition: background .2s, color .2s;
 }
 
-.seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] {
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
   color: #14100A;
 }
+
 .seg button:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
 
-.hint {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--text-dim);
-  min-height: 1em;
-}
+.sheet-actions { display: flex; gap: 8px; margin-top: 20px; }
+.sheet-actions .btn { flex: 1; text-align: center; padding: 12px 10px; }
 
-.field.gap { margin-top: 24px; }
+.hint { margin: 7px 0 0; font-size: 12px; color: var(--text-dim); min-height: 1em; }
+
+.field.gap { margin-top: 20px; }
 
 .inp {
   width: 100%;
-  padding: 10px 14px;
+  padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel-2);
@@ -752,10 +626,10 @@ button { font: inherit; color: inherit; }
 .code-big {
   margin: 4px 0 2px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 40px;
-  letter-spacing: .28em;
+  font-size: 34px;
+  letter-spacing: .24em;
   text-align: center;
-  text-indent: .28em;
+  text-indent: .24em;
   color: var(--brass-lit);
 }
 
@@ -781,98 +655,66 @@ button { font: inherit; color: inherit; }
   font-size: 13px;
 }
 
-.tables li.muted {
-  color: var(--text-dim);
-  border-style: dashed;
-  background: transparent;
-}
-
-.tables b {
-  font-weight: 500;
-  letter-spacing: .16em;
-  color: var(--brass-lit);
-}
-
+.tables li.muted { color: var(--text-dim); border-style: dashed; background: transparent; }
+.tables b { font-weight: 500; letter-spacing: .16em; color: var(--brass-lit); }
 .tables span { color: var(--text-dim); margin-right: auto; }
 .tables .btn { padding: 6px 13px; font-size: 12px; }
 
 .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 
-.sheet-actions { display: flex; gap: 10px; margin-top: 22px; }
-.sheet-actions .btn { flex: 1; text-align: center; padding: 11px 16px; }
-
 .rules { font-size: 13.5px; color: var(--text-dim); }
+
 .rules h3 {
-  margin: 18px 0 5px;
+  margin: 16px 0 4px;
   font-family: Forum, Georgia, serif;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 400;
-  letter-spacing: .08em;
+  letter-spacing: .07em;
   text-transform: uppercase;
   color: var(--text);
 }
-.rules p { margin: 0 0 8px; max-width: 62ch; }
+
+.rules p { margin: 0 0 7px; }
 .rules b { color: var(--text); font-weight: 500; }
 
 .crown {
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
-  margin: 0 auto 14px;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 12px;
   border-radius: 50%;
   border: 1px solid var(--line);
 }
 
-.crown .disc { width: 40px; height: 40px; }
+.crown .disc { width: 38px; height: 38px; }
 
-/* ---------- адаптив ---------- */
+/* ---------- совсем узкие экраны ---------- */
 
-@media (max-width: 860px) {
-  .app { padding: 12px 12px 28px; gap: 12px; }
-  .mark { font-size: 22px; }
-  .mark em { display: none; }
-  .panels { grid-template-columns: 1fr; }
-  .log { order: 3; }
-  .rail { flex-wrap: wrap; gap: 10px; }
-  .tally { order: 3; margin-left: 0; }
-  .rail-actions { margin-left: auto; }
-  .btn { padding: 7px 12px; font-size: 12px; }
-}
-
+/* на телефоне название не нужно — его показывает сам Telegram */
 @media (max-width: 560px) {
-  .btn .wide { display: none; }
-  .btn .tight { display: inline; }
-  .btn { padding: 7px 11px; }
-  .sheet { padding: 20px 18px; }
-  .sheet h1 { font-size: 27px; }
+  .mark { display: none; }
+  .tally { margin-left: 0; margin-right: auto; }
+  .app { padding-left: calc(6px + env(safe-area-inset-left)); padding-right: calc(6px + env(safe-area-inset-right)); }
 }
 
-/* Телефон в портрете: доска разворачивается на 90°, шашки становятся
-   в полтора раза крупнее — иначе играть пальцем невозможно. */
-@media (max-width: 700px) and (orientation: portrait) {
-  .stage {
-    width: 100%;
-    aspect-ratio: 820 / 1240;
-    overflow: hidden;
-  }
-  .stage .board {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 151.22%;
-    transform: translate(-50%, -50%) rotate(90deg);
-  }
-  .log ol { max-height: 58px; }
-  .panels { gap: 8px; }
-  .plaque { padding: 10px 12px; }
+@media (max-width: 380px) {
+  .btn { padding: 8px 11px; font-size: 12px; }
+  .btn-icon { width: 34px; height: 34px; }
+  .pstats { gap: 10px; }
+}
+
+@media (max-height: 620px) {
+  .plaque { padding: 6px 11px; }
+  .pname { font-size: 15px; }
+  .pmeta { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
-  .man { transition-duration: .01ms; }
+  *, .man { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 </style>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <div class="app">
 
   <header class="rail">
@@ -880,56 +722,23 @@ button { font: inherit; color: inherit; }
 
     <div class="tally">
       <span class="chip" id="net-chip" hidden></span>
-      <span>счёт</span>
       <b id="tally-w">0</b>
       <span>:</span>
       <b id="tally-b">0</b>
     </div>
 
     <nav class="rail-actions">
-      <button class="btn" id="act-hint" type="button" title="Показать сильный ход"><span class="wide">Подсказка</span><span class="tight">Совет</span></button>
-      <button class="btn" id="act-undo" type="button" title="Вернуть последнюю шашку"><span class="wide">Отменить</span><span class="tight">Назад</span></button>
-      <button class="btn" id="act-rules" type="button">Правила</button>
+      <button class="btn btn-icon" id="act-hint" type="button" title="Подсказка" aria-label="Подсказка">?</button>
+      <button class="btn btn-icon" id="act-undo" type="button" title="Отменить ход" aria-label="Отменить ход">↶</button>
       <button class="btn btn-icon" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
-      <button class="btn btn-key" id="act-new" type="button"><span class="wide">Новая партия</span><span class="tight">Новая</span></button>
+      <button class="btn btn-key" id="act-new" type="button">Партия</button>
     </nav>
   </header>
 
   <main class="table">
-   <div class="stage" id="stage">
-    <div class="board" id="board">
-      <canvas id="scene"></canvas>
-      <div class="layer hit" id="zones"></div>
-      <div class="layer" id="men"></div>
-      <div class="layer" id="spots"></div>
-      <div class="layer" id="dice"></div>
-    </div>
-    <div class="quip" id="quip"></div>
-    <div class="toast" id="toast"></div>
-   </div>
-  </main>
-
-  <section class="panels">
-    <div class="plaque" id="pl-w">
-      <span class="disc w"></span>
-      <div>
-        <div class="pname">Белые</div>
-        <div class="pmeta" id="meta-w">Игрок</div>
-      </div>
-      <div class="pstats">
-        <div><b id="pip-w">360</b><span>пипсы</span></div>
-        <div><b id="off-w">0</b><span>снято</span></div>
-      </div>
-    </div>
-
-    <div class="log">
-      <h2>Ход за ходом</h2>
-      <ol id="log"></ol>
-    </div>
-
     <div class="plaque" id="pl-b">
       <span class="disc b"></span>
-      <div>
+      <div class="pwho">
         <div class="pname">Чёрные</div>
         <div class="pmeta" id="meta-b">Компьютер</div>
       </div>
@@ -938,6 +747,35 @@ button { font: inherit; color: inherit; }
         <div><b id="off-b">0</b><span>снято</span></div>
       </div>
     </div>
+
+    <div class="stage" id="stage">
+      <div class="board" id="board">
+        <canvas id="scene"></canvas>
+        <div class="layer hit" id="zones"></div>
+        <div class="layer" id="men"></div>
+        <div class="layer" id="spots"></div>
+        <div class="layer" id="dice"></div>
+      </div>
+      <div class="quip" id="quip"></div>
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <div class="plaque" id="pl-w">
+      <span class="disc w"></span>
+      <div class="pwho">
+        <div class="pname">Белые</div>
+        <div class="pmeta" id="meta-w">Игрок</div>
+      </div>
+      <div class="pstats">
+        <div><b id="pip-w">360</b><span>пипсы</span></div>
+        <div><b id="off-w">0</b><span>снято</span></div>
+      </div>
+    </div>
+  </main>
+
+  <section class="log">
+    <h2>Ход за ходом</h2>
+    <ol id="log"></ol>
   </section>
 
 </div>
@@ -1351,8 +1189,13 @@ button { font: inherit; color: inherit; }
 </script>
 <script>
 /* ============================================================
-   Отрисовка доски: орех, латунная инкрустация, войлочные пункты.
-   Всё в «виртуальных» координатах 1240×820, canvas масштабирует.
+   Доска: резной орех, костяные вставки, шашки и кости рисуются
+   на canvas и раздаются интерфейсу картинками.
+
+   Вся геометрия считается в «альбомных» координатах 1240×820.
+   На телефоне доска стоит вертикально: холст поворачивается на
+   90°, а надписи, кости и метки рисуются ровно — поэтому ничего
+   не читается вбок.
    ============================================================ */
 (function (global) {
   'use strict';
@@ -1366,18 +1209,29 @@ button { font: inherit; color: inherit; }
   var FY0 = FRAME + 10, FY1 = VH - FRAME - 10;
   var PTH = 316, CD = 66, DD = 62;
 
+  var tall = false;   /* вертикальная раскладка */
+
   var C = {
-    frameHi: '#5A3722', frameLo: '#24140D',
-    bed: '#3E2517', bedLo: '#241209',
+    frameHi: '#5E3A23', frameLo: '#1E110B',
+    bed: '#3E2517', bedLo: '#200F07',
     bone: '#D9C39B', boneMid: '#C2A97E', boneLo: '#9C8256',
     felt: '#1D5A53', feltMid: '#154742', feltLo: '#0E332F',
     brass: '#C8A24A', dark: '#2B1710'
   };
 
+  function setTall(v) { tall = !!v; }
+  function isTall() { return tall; }
+  function vw() { return tall ? VH : VW; }
+  function vh() { return tall ? VW : VH; }
+
+  /* Прямоугольник из альбомных координат в текущие */
+  function map(x, y, w, h) {
+    if (!tall) return { x: x, y: y, w: w, h: h };
+    return { x: VH - y - h, y: x, w: h, h: w };
+  }
+
   function colX(j) { return FX0 + j * PTW + (j >= 6 ? BAR : 0); }
 
-  /* Геометрия пункта i: верхний ряд — 12..23 слева направо,
-     нижний — 11..0 слева направо. */
   function geom(i) {
     var top = i >= 12;
     var j = top ? i - 12 : 11 - i;
@@ -1389,7 +1243,6 @@ button { font: inherit; color: inherit; }
     return Math.max(15, Math.min(58, (PTH - CD) / (n - 1)));
   }
 
-  /* Позиция k-й шашки в стопке из n на пункте i */
   function manAt(i, k, n) {
     var g = geom(i), sp = gapFor(n);
     return {
@@ -1398,14 +1251,13 @@ button { font: inherit; color: inherit; }
     };
   }
 
-  /* Позиция k-й снятой шашки в лотке */
   function trayAt(player, k) {
-    var x = player === 'w' ? VW - FRAME - TRAY + (TRAY - CD) / 2 : FRAME + (TRAY - CD) / 2;
-    var y = player === 'w' ? FY0 + k * 30 : FY1 - CD - k * 30;
-    return { x: x, y: y };
+    return {
+      x: player === 'w' ? VW - FRAME - TRAY + (TRAY - CD) / 2 : FRAME + (TRAY - CD) / 2,
+      y: player === 'w' ? FY0 + k * 30 : FY1 - CD - k * 30
+    };
   }
 
-  /* Прямоугольник лотка для снятых шашек */
   function trayBox(player) {
     return {
       x: player === 'w' ? VW - FRAME - TRAY + 3 : FRAME + 3,
@@ -1421,7 +1273,7 @@ button { font: inherit; color: inherit; }
     return { x: cx - total / 2 + idx * (DD + 10), y: (FY0 + PTH + FY1 - PTH) / 2 - DD / 2 };
   }
 
-  /* ---------- рисование ---------- */
+  /* ---------- вспомогательное ---------- */
 
   function rnd32(a) {
     return function () {
@@ -1443,7 +1295,6 @@ button { font: inherit; color: inherit; }
     ctx.closePath();
   }
 
-  /* Древесные волокна */
   function grain(ctx, x, y, w, h, seed, lines, alpha) {
     var r = rnd32(seed), i, xx, yy, amp, ph, per;
     ctx.save();
@@ -1457,120 +1308,199 @@ button { font: inherit; color: inherit; }
       ctx.moveTo(x, yy);
       for (xx = x; xx <= x + w; xx += 12) ctx.lineTo(xx, yy + Math.sin(xx / per + ph) * amp);
       ctx.strokeStyle = r() > 0.45
-        ? 'rgba(255,218,168,' + (alpha * r() * 0.9).toFixed(3) + ')'
-        : 'rgba(24,12,4,' + (alpha * 1.7 * r()).toFixed(3) + ')';
+        ? 'rgba(255,214,160,' + (alpha * r() * 0.9).toFixed(3) + ')'
+        : 'rgba(22,10,3,' + (alpha * 1.8 * r()).toFixed(3) + ')';
       ctx.lineWidth = 0.5 + r() * 1.7;
       ctx.stroke();
     }
     ctx.restore();
   }
 
-  /* Хатам: цепочка ромбов вдоль отрезка */
-  function inlayRun(ctx, x0, y0, x1, y1, offset) {
-    var len = Math.hypot(x1 - x0, y1 - y0), step = 21.5;
-    var n = Math.floor(len / step), i, t, x, y, k;
-    var pal = [C.bone, C.brass, C.dark, C.brass];
+  /* Резьба: канавка идёт светлой и тёмной нитью — как след стамески */
+  function cut(ctx, path, depth, light) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.translate(0, -depth);
+    ctx.strokeStyle = 'rgba(255,226,180,' + (light || 0.30) + ')';
+    ctx.lineWidth = 1.6;
+    path(ctx);
+    ctx.restore();
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(20,9,3,.55)';
+    ctx.lineWidth = 2.2;
+    path(ctx);
+    ctx.restore();
+  }
+
+  /* Розетка-солнце: главный мотив резных нард */
+  function rosette(ctx, cx, cy, r, rays) {
+    var i, a, step = Math.PI * 2 / rays;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    cut(ctx, function (c) {
+      c.beginPath();
+      for (i = 0; i < rays; i++) {
+        a = i * step;
+        c.moveTo(Math.cos(a) * r * 0.30, Math.sin(a) * r * 0.30);
+        c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      c.stroke();
+    }, 1, 0.24);
+
+    cut(ctx, function (c) {
+      c.beginPath();
+      for (i = 0; i < rays; i++) {
+        a = i * step + step / 2;
+        c.moveTo(Math.cos(a) * r * 0.44, Math.sin(a) * r * 0.44);
+        c.lineTo(Math.cos(a) * r * 0.86, Math.sin(a) * r * 0.86);
+      }
+      c.stroke();
+    }, 1, 0.16);
+
+    [r * 0.30, r * 0.46, r].forEach(function (rr, k) {
+      cut(ctx, function (c) {
+        c.beginPath();
+        c.arc(0, 0, rr, 0, 6.284);
+        c.stroke();
+      }, 1, k === 2 ? 0.26 : 0.20);
+    });
+
+    var g = ctx.createRadialGradient(-r * 0.12, -r * 0.12, 1, 0, 0, r * 0.30);
+    g.addColorStop(0, 'rgba(255,224,170,.20)');
+    g.addColorStop(1, 'rgba(24,11,4,.45)');
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.28, 0, 6.284);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* Ёлочка вдоль борта — самый ходовой резной поясок */
+  function chevrons(ctx, x0, y0, x1, y1, size) {
+    var len = Math.hypot(x1 - x0, y1 - y0), n = Math.floor(len / (size * 1.5));
+    var ang = Math.atan2(y1 - y0, x1 - x0), i, t, x, y;
     for (i = 0; i <= n; i++) {
-      t = (i * step) / len;
+      t = (i * size * 1.5) / len;
       x = x0 + (x1 - x0) * t;
       y = y0 + (y1 - y0) * t;
-      k = (i + offset) % pal.length;
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = pal[k];
-      ctx.globalAlpha = k === 2 ? 0.85 : 0.92;
-      ctx.fillRect(-4.6, -4.6, 9.2, 9.2);
+      ctx.rotate(ang);
+      cut(ctx, function (c) {
+        c.beginPath();
+        c.moveTo(-size * 0.5, -size * 0.55);
+        c.lineTo(size * 0.32, 0);
+        c.lineTo(-size * 0.5, size * 0.55);
+        c.stroke();
+      }, 0.8, 0.26);
       ctx.restore();
     }
   }
 
+  /* ---------- части доски ---------- */
+
   function drawFrame(ctx) {
     var g = ctx.createLinearGradient(0, 0, VW * 0.6, VH);
     g.addColorStop(0, C.frameHi);
-    g.addColorStop(0.45, '#3A2115');
+    g.addColorStop(0.45, '#3B2114');
     g.addColorStop(1, C.frameLo);
-    rrect(ctx, 0, 0, VW, VH, 18);
+    rrect(ctx, 0, 0, VW, VH, 20);
     ctx.fillStyle = g;
     ctx.fill();
-    grain(ctx, 0, 0, VW, VH, 7, 190, 0.10);
+    grain(ctx, 0, 0, VW, VH, 7, 210, 0.12);
 
     var c = FRAME / 2;
-    inlayRun(ctx, c, c, VW - c, c, 0);
-    inlayRun(ctx, c, VH - c, VW - c, VH - c, 2);
-    inlayRun(ctx, c, c, c, VH - c, 1);
-    inlayRun(ctx, VW - c, c, VW - c, VH - c, 3);
+    ctx.save();
+    ctx.beginPath();
+    rrect(ctx, 0, 0, VW, VH, 20);
+    rrect(ctx, FRAME, FRAME, VW - 2 * FRAME, VH - 2 * FRAME, 6);
+    ctx.clip('evenodd');
+    chevrons(ctx, 60, c, VW - 60, c, 15);
+    chevrons(ctx, VW - 60, VH - c, 60, VH - c, 15);
+    chevrons(ctx, c, VH - 60, c, 60, 15);
+    chevrons(ctx, VW - c, 60, VW - c, VH - 60, 15);
+    ctx.restore();
 
-    ctx.strokeStyle = 'rgba(200,162,74,.55)';
+    [[c + 2, c + 2], [VW - c - 2, c + 2], [c + 2, VH - c - 2], [VW - c - 2, VH - c - 2]]
+      .forEach(function (p) { rosette(ctx, p[0], p[1], 15, 8); });
+
+    ctx.strokeStyle = 'rgba(200,162,74,.42)';
     ctx.lineWidth = 1.1;
-    rrect(ctx, 2.5, 2.5, VW - 5, VH - 5, 16); ctx.stroke();
-    rrect(ctx, FRAME - 2.5, FRAME - 2.5, VW - 2 * FRAME + 5, VH - 2 * FRAME + 5, 6); ctx.stroke();
+    rrect(ctx, 3.5, 3.5, VW - 7, VH - 7, 17); ctx.stroke();
+    rrect(ctx, FRAME - 2.5, FRAME - 2.5, VW - 2 * FRAME + 5, VH - 2 * FRAME + 5, 7); ctx.stroke();
   }
 
   function drawBed(ctx) {
     var x = FRAME, y = FRAME, w = VW - 2 * FRAME, h = VH - 2 * FRAME;
     var g = ctx.createLinearGradient(0, y, 0, y + h);
     g.addColorStop(0, C.bed);
-    g.addColorStop(0.5, '#341E12');
+    g.addColorStop(0.5, '#361F12');
     g.addColorStop(1, C.bedLo);
     ctx.fillStyle = g;
     ctx.fillRect(x, y, w, h);
-    grain(ctx, x, y, w, h, 21, 150, 0.09);
+    grain(ctx, x, y, w, h, 21, 170, 0.10);
 
-    /* тень от бортов */
-    var s = ctx.createLinearGradient(x, 0, x + 40, 0);
+    var s = ctx.createLinearGradient(x, 0, x + 44, 0);
+    s.addColorStop(0, 'rgba(0,0,0,.6)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s; ctx.fillRect(x, y, 44, h);
+    s = ctx.createLinearGradient(x + w, 0, x + w - 44, 0);
+    s.addColorStop(0, 'rgba(0,0,0,.6)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s; ctx.fillRect(x + w - 44, y, 44, h);
+    s = ctx.createLinearGradient(0, y, 0, y + 32);
     s.addColorStop(0, 'rgba(0,0,0,.55)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(x, y, 40, h);
-    s = ctx.createLinearGradient(x + w, 0, x + w - 40, 0);
-    s.addColorStop(0, 'rgba(0,0,0,.55)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(x + w - 40, y, 40, h);
-    s = ctx.createLinearGradient(0, y, 0, y + 30);
-    s.addColorStop(0, 'rgba(0,0,0,.5)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(x, y, w, 30);
+    ctx.fillStyle = s; ctx.fillRect(x, y, w, 32);
   }
 
   function drawTray(ctx, side) {
-    var x = side === 'l' ? FRAME + 3 : VW - FRAME - TRAY + 3;
-    var y = FRAME + 8, w = TRAY - 6, h = VH - 2 * FRAME - 16;
-    rrect(ctx, x, y, w, h, 9);
-    ctx.fillStyle = '#1B0F08';
+    var b = trayBox(side === 'l' ? 'b' : 'w');
+    rrect(ctx, b.x, b.y, b.w, b.h, 10);
+    ctx.fillStyle = '#190D06';
     ctx.fill();
     ctx.save();
     ctx.clip();
-    grain(ctx, x, y, w, h, side === 'l' ? 33 : 44, 40, 0.07);
-    var s = ctx.createLinearGradient(x, y, x + 22, y);
-    s.addColorStop(0, 'rgba(0,0,0,.75)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(x, y, 22, h);
+    grain(ctx, b.x, b.y, b.w, b.h, side === 'l' ? 33 : 44, 44, 0.08);
+    var s = ctx.createLinearGradient(b.x, b.y, b.x + 24, b.y);
+    s.addColorStop(0, 'rgba(0,0,0,.8)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s; ctx.fillRect(b.x, b.y, 24, b.h);
     ctx.restore();
-    ctx.strokeStyle = 'rgba(200,162,74,.32)';
+    ctx.strokeStyle = 'rgba(200,162,74,.3)';
     ctx.lineWidth = 1;
-    rrect(ctx, x, y, w, h, 9); ctx.stroke();
+    rrect(ctx, b.x, b.y, b.w, b.h, 10); ctx.stroke();
+    label(ctx, b.x + b.w / 2, side === 'l' ? b.y + 34 : b.y + b.h - 34, 'ДОМ');
+  }
 
-    /* гравировка «ДОМ» у дальнего края лотка */
+  /* Надпись всегда стоит ровно, как бы ни лежала доска */
+  function label(ctx, x, y, text) {
     ctx.save();
-    ctx.translate(x + w / 2, side === 'l' ? y + 40 : y + h - 40);
-    ctx.rotate(side === 'l' ? -Math.PI / 2 : Math.PI / 2);
-    ctx.fillStyle = 'rgba(200,162,74,.42)';
+    ctx.translate(x, y);
+    if (tall) ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = 'rgba(214,178,104,.5)';
     ctx.font = '500 15px "IBM Plex Mono", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '5px';
-    ctx.fillText('ДОМ', 0, 0);
+    ctx.fillText(text, 0, 0);
     ctx.restore();
   }
 
   function drawBar(ctx) {
     var x = FX0 + 6 * PTW, y = FRAME + 8, h = VH - 2 * FRAME - 16;
     var g = ctx.createLinearGradient(x, 0, x + BAR, 0);
-    g.addColorStop(0, '#160C06');
-    g.addColorStop(0.5, '#4A2B1A');
-    g.addColorStop(1, '#160C06');
-    rrect(ctx, x, y, BAR, h, 7);
+    g.addColorStop(0, '#150B05');
+    g.addColorStop(0.5, '#4E2D1B');
+    g.addColorStop(1, '#150B05');
+    rrect(ctx, x, y, BAR, h, 8);
     ctx.fillStyle = g; ctx.fill();
-    grain(ctx, x, y, BAR, h, 55, 26, 0.10);
-    ctx.strokeStyle = 'rgba(200,162,74,.30)';
+    ctx.save();
+    ctx.clip();
+    grain(ctx, x, y, BAR, h, 55, 30, 0.12);
+    chevrons(ctx, x + BAR / 2, y + 30, x + BAR / 2, y + h - 30, 13);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(200,162,74,.28)';
     ctx.lineWidth = 1;
-    rrect(ctx, x, y, BAR, h, 7); ctx.stroke();
+    rrect(ctx, x, y, BAR, h, 8); ctx.stroke();
   }
 
   function drawPoints(ctx) {
@@ -1593,12 +1523,19 @@ button { font: inherit; color: inherit; }
       }
       ctx.fillStyle = grd;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(200,162,74,.18)';
-      ctx.lineWidth = 1;
+      ctx.save();
+      ctx.clip();
+      grain(ctx, g.x, Math.min(baseY, apexY), PTW, PTH, 100 + i, 14, light ? 0.07 : 0.05);
+      ctx.restore();
+      ctx.strokeStyle = light ? 'rgba(70,45,18,.45)' : 'rgba(0,0,0,.45)';
+      ctx.lineWidth = 1.2;
       ctx.stroke();
     }
-    /* латунная нить вдоль домов */
-    ctx.strokeStyle = 'rgba(200,162,74,.5)';
+    /* резные солнца в свободных полях между рядами */
+    rosette(ctx, FX0 + 3 * PTW, VH / 2, 40, 12);
+    rosette(ctx, FX0 + 9 * PTW + BAR, VH / 2, 40, 12);
+
+    ctx.strokeStyle = 'rgba(200,162,74,.45)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(colX(6), FY0 - 3); ctx.lineTo(colX(11) + PTW, FY0 - 3);
@@ -1608,16 +1545,16 @@ button { font: inherit; color: inherit; }
 
   function drawLight(ctx) {
     var g = ctx.createLinearGradient(0, 0, VW * 0.75, VH);
-    g.addColorStop(0, 'rgba(255,240,214,.09)');
-    g.addColorStop(0.35, 'rgba(255,240,214,.02)');
+    g.addColorStop(0, 'rgba(255,238,208,.10)');
+    g.addColorStop(0.35, 'rgba(255,238,208,.02)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    rrect(ctx, 0, 0, VW, VH, 18);
+    rrect(ctx, 0, 0, VW, VH, 20);
     ctx.fillStyle = g; ctx.fill();
 
     var v = ctx.createRadialGradient(VW / 2, VH * 0.42, VH * 0.30, VW / 2, VH * 0.5, VH * 0.95);
     v.addColorStop(0, 'rgba(0,0,0,0)');
-    v.addColorStop(1, 'rgba(0,0,0,.45)');
-    rrect(ctx, 0, 0, VW, VH, 18);
+    v.addColorStop(1, 'rgba(0,0,0,.5)');
+    rrect(ctx, 0, 0, VW, VH, 20);
     ctx.fillStyle = v; ctx.fill();
   }
 
@@ -1628,7 +1565,9 @@ button { font: inherit; color: inherit; }
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     var ctx = canvas.getContext('2d');
-    ctx.setTransform(w * dpr / VW, 0, 0, h * dpr / VH, 0, 0);
+    var k = (tall ? h : w) * dpr / VW;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    if (tall) { ctx.translate(VH, 0); ctx.rotate(Math.PI / 2); }
     ctx.clearRect(0, 0, VW, VH);
     drawFrame(ctx);
     drawBed(ctx);
@@ -1639,10 +1578,196 @@ button { font: inherit; color: inherit; }
     drawLight(ctx);
   }
 
+  /* ---------- шашки и кости картинками ---------- */
+
+  var cache = {};
+
+  function face(px, paint) {
+    var cv = global.document.createElement('canvas');
+    cv.width = cv.height = px;
+    paint(cv.getContext('2d'), px);
+    return cv.toDataURL('image/png');
+  }
+
+  /* Точёная шашка: фаска, две канавки и резная звезда посередине */
+  function checker(side, px) {
+    var key = 'man' + side + px;
+    if (cache[key]) return cache[key];
+    cache[key] = face(px, function (ctx, s) {
+      var r = s / 2, i, a;
+      var bone = side === 'w';
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(r, r, r - 1, 0, 6.284);
+      ctx.clip();
+
+      var g = ctx.createRadialGradient(r * 0.68, r * 0.6, r * 0.1, r, r, r);
+      if (bone) {
+        g.addColorStop(0, '#FFFAEC'); g.addColorStop(0.42, '#F2E1BB');
+        g.addColorStop(0.78, '#D6BA8A'); g.addColorStop(1, '#9A7C4B');
+      } else {
+        g.addColorStop(0, '#6A5C4B'); g.addColorStop(0.42, '#42372C');
+        g.addColorStop(0.78, '#241C15'); g.addColorStop(1, '#0C0906');
+      }
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+
+      var gr = rnd32(bone ? 5 : 9);
+      ctx.globalAlpha = bone ? 0.20 : 0.26;
+      for (i = 0; i < 46; i++) {
+        a = gr() * 6.284;
+        var rr = r * (0.2 + gr() * 0.78);
+        ctx.beginPath();
+        ctx.arc(r, r, rr, a, a + 0.35 + gr() * 0.7);
+        ctx.strokeStyle = gr() > 0.5 ? 'rgba(255,240,210,.5)' : 'rgba(30,18,6,.5)';
+        ctx.lineWidth = 0.4 + gr() * 1.1;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      [0.80, 0.62].forEach(function (f) {
+        ctx.beginPath(); ctx.arc(r, r - s * 0.008, r * f, 0, 6.284);
+        ctx.strokeStyle = bone ? 'rgba(255,250,235,.55)' : 'rgba(210,180,120,.20)';
+        ctx.lineWidth = s * 0.018; ctx.stroke();
+        ctx.beginPath(); ctx.arc(r, r + s * 0.008, r * f, 0, 6.284);
+        ctx.strokeStyle = 'rgba(40,24,8,.45)';
+        ctx.lineWidth = s * 0.018; ctx.stroke();
+      });
+
+      /* насечка по ободу — след резца на токарном станке */
+      ctx.save();
+      ctx.translate(r, r);
+      for (i = 0; i < 48; i++) {
+        a = i * Math.PI / 24;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.87, Math.sin(a) * r * 0.87);
+        ctx.lineTo(Math.cos(a) * r * 0.955, Math.sin(a) * r * 0.955);
+        ctx.strokeStyle = 'rgba(40,24,8,.30)';
+        ctx.lineWidth = s * 0.016;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.87, Math.sin(a) * r * 0.87 - s * 0.01);
+        ctx.lineTo(Math.cos(a) * r * 0.955, Math.sin(a) * r * 0.955 - s * 0.01);
+        ctx.strokeStyle = bone ? 'rgba(255,250,232,.34)' : 'rgba(206,174,116,.16)';
+        ctx.lineWidth = s * 0.012;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(r, r);
+      for (i = 0; i < 8; i++) {
+        a = i * Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.12, Math.sin(a) * r * 0.12);
+        ctx.lineTo(Math.cos(a) * r * 0.44, Math.sin(a) * r * 0.44);
+        ctx.strokeStyle = 'rgba(40,24,8,.42)';
+        ctx.lineWidth = s * 0.022;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.12, Math.sin(a) * r * 0.12 - s * 0.012);
+        ctx.lineTo(Math.cos(a) * r * 0.44, Math.sin(a) * r * 0.44 - s * 0.012);
+        ctx.strokeStyle = bone ? 'rgba(255,248,228,.5)' : 'rgba(200,168,110,.22)';
+        ctx.lineWidth = s * 0.016;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.12, 0, 6.284);
+      ctx.fillStyle = bone ? 'rgba(120,92,48,.35)' : 'rgba(200,162,74,.3)';
+      ctx.fill();
+      ctx.restore();
+
+      var sh = ctx.createRadialGradient(r, r, r * 0.72, r, r, r);
+      sh.addColorStop(0, 'rgba(0,0,0,0)');
+      sh.addColorStop(1, bone ? 'rgba(60,40,14,.5)' : 'rgba(0,0,0,.65)');
+      ctx.fillStyle = sh;
+      ctx.fillRect(0, 0, s, s);
+
+      var hi = ctx.createLinearGradient(0, 0, s * 0.7, s * 0.8);
+      hi.addColorStop(0, bone ? 'rgba(255,255,245,.5)' : 'rgba(255,236,200,.16)');
+      hi.addColorStop(0.55, 'rgba(255,255,245,0)');
+      ctx.fillStyle = hi;
+      ctx.fillRect(0, 0, s, s);
+      ctx.restore();
+    });
+    return cache[key];
+  }
+
+  var PIPS = {
+    1: [[50, 50]],
+    2: [[27, 27], [73, 73]],
+    3: [[27, 27], [50, 50], [73, 73]],
+    4: [[27, 27], [73, 27], [27, 73], [73, 73]],
+    5: [[27, 27], [73, 27], [50, 50], [27, 73], [73, 73]],
+    6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]]
+  };
+
+  /* Костяной кубик: точка в кольце — как на старых игральных костях */
+  function die(side, value, px) {
+    var key = 'die' + side + value + px;
+    if (cache[key]) return cache[key];
+    cache[key] = face(px, function (ctx, s) {
+      var bone = side === 'w', i, gr = rnd32(value * 7 + (bone ? 1 : 2));
+      ctx.save();
+      rrect(ctx, 1, 1, s - 2, s - 2, s * 0.2);
+      ctx.clip();
+      var g = ctx.createLinearGradient(0, 0, s * 0.9, s);
+      if (bone) {
+        g.addColorStop(0, '#FFFAEC'); g.addColorStop(0.5, '#EFE0BD'); g.addColorStop(1, '#C9B183');
+      } else {
+        g.addColorStop(0, '#4E4437'); g.addColorStop(0.5, '#2C2419'); g.addColorStop(1, '#120D08');
+      }
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+
+      ctx.globalAlpha = bone ? 0.18 : 0.22;
+      for (i = 0; i < 26; i++) {
+        ctx.beginPath();
+        var y0 = gr() * s;
+        ctx.moveTo(0, y0);
+        ctx.bezierCurveTo(s * 0.3, y0 + (gr() - 0.5) * 8, s * 0.7, y0 + (gr() - 0.5) * 8, s, y0 + (gr() - 0.5) * 6);
+        ctx.strokeStyle = gr() > 0.5 ? 'rgba(255,244,220,.6)' : 'rgba(40,25,8,.6)';
+        ctx.lineWidth = 0.4 + gr();
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      PIPS[value].forEach(function (p) {
+        var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.085;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr * 1.9, 0, 6.284);
+        ctx.strokeStyle = bone ? 'rgba(70,48,18,.38)' : 'rgba(226,206,160,.34)';
+        ctx.lineWidth = s * 0.016;
+        ctx.stroke();
+        var pg = ctx.createRadialGradient(cx - rr * 0.3, cy - rr * 0.35, rr * 0.1, cx, cy, rr);
+        if (bone) { pg.addColorStop(0, '#6A5537'); pg.addColorStop(1, '#241A0D'); }
+        else { pg.addColorStop(0, '#F6EAC8'); pg.addColorStop(1, '#B39A63'); }
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr, 0, 6.284);
+        ctx.fillStyle = pg;
+        ctx.fill();
+      });
+
+      var hi = ctx.createLinearGradient(0, 0, s * 0.5, s * 0.6);
+      hi.addColorStop(0, bone ? 'rgba(255,255,248,.55)' : 'rgba(255,240,210,.14)');
+      hi.addColorStop(0.6, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hi;
+      ctx.fillRect(0, 0, s, s);
+      var sh = ctx.createLinearGradient(s * 0.4, s * 0.5, s, s);
+      sh.addColorStop(0, 'rgba(0,0,0,0)');
+      sh.addColorStop(1, bone ? 'rgba(70,48,16,.34)' : 'rgba(0,0,0,.5)');
+      ctx.fillStyle = sh;
+      ctx.fillRect(0, 0, s, s);
+      ctx.restore();
+    });
+    return cache[key];
+  }
+
   global.NardyBoard = {
     VW: VW, VH: VH, CD: CD, DD: DD, PTW: PTW, PTH: PTH, FY0: FY0, FY1: FY1,
-    geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt, gapFor: gapFor,
-    render: render
+    setTall: setTall, isTall: isTall, vw: vw, vh: vh, map: map,
+    geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt,
+    gapFor: gapFor, render: render, checker: checker, die: die
   };
 })(window);
 </script>
@@ -1662,101 +1787,163 @@ button { font: inherit; color: inherit; }
       'Опять шеш-беш? Ты кости где брал, у напёрсточников?',
       'Шесть-шесть. Совесть есть вообще?',
       'Ну пиздец. Ладно, играем дальше',
-      'Да он мухлюет, зуб даю'
+      'Да он мухлюет, зуб даю',
+      'Кости к нему в гости ходят, что ли?',
+      'Ещё один шеш-беш, и я встаю из-за стола'
     ],
     'six.me': [
       'Шеш-беш, блядь! Вот это по-нашему',
       'Наконец-то кости вспомнили, кто тут хозяин',
       'Держите меня семеро',
-      'Вот это заход, мама дорогая'
+      'Вот это заход, мама дорогая',
+      'Шеш-беш. Не благодарите'
     ],
     'double.foe': [
       'Да сколько можно дублей, а?',
       'Опять дубль. Ну конечно',
       'Ты серьёзно сейчас?',
-      'Кости к нему неровно дышат, я смотрю'
+      'Кости к нему неровно дышат, я смотрю',
+      'Везёт дуракам, что тут скажешь'
     ],
     'double.me': [
       'Дубль! Живём',
       'Кости сегодня добрые',
-      'Четыре хода. Красота'
+      'Четыре хода. Красота',
+      'Пошла масть'
     ],
     'worst.me': [
       'Два-один. Спасибо, кости, удружили',
       'Ну и хуйня, а не бросок',
-      'Три очка за ход. Я в ярости'
+      'Три очка за ход. Я в ярости',
+      'Кости, вы издеваетесь?'
     ],
     'worst.foe': [
       'Два-один. Так тебе и надо',
-      'Ха! Вот это я понимаю справедливость'
+      'Ха! Вот это я понимаю справедливость',
+      'Три очка. Посиди, подумай'
     ],
     'stuck.me': [
       'Приехали. Хода нет',
       'Ну заебись, стою как дурак',
-      'Пропускаю. Не смотрите на меня так'
+      'Пропускаю. Не смотрите на меня так',
+      'Некуда. Совсем некуда'
     ],
     'stuck.foe': [
       'Что, некуда сходить? Сочувствую. Не очень',
-      'Стоит, бедолага'
+      'Стоит, бедолага',
+      'Ага, застрял. Приятного вечера'
     ],
     'off.me': [
       'Пошли домой, родные',
       'Минус одна. Поехали',
-      'Так-так-так, дело пошло'
+      'Так-так-так, дело пошло',
+      'Домой, родимая'
     ],
     'off.foe': [
       'Э, куда потащил?',
-      'Не спеши, ещё не вечер'
+      'Не спеши, ещё не вечер',
+      'Он снимает. Мне это не нравится'
     ],
     'head.me': [
       'Голова не рассасывается. Пора шевелиться',
-      'Вся толпа так и сидит дома'
+      'Вся толпа так и сидит дома',
+      'С головы по одной, а их там как в автобусе'
+    ],
+    'home.me': [
+      'Все дома. Можно и разливать',
+      'Собрались, красавцы'
+    ],
+    'home.foe': [
+      'Он уже дома. Плохо дело',
+      'Ну всё, начинается'
+    ],
+    'almost.me': [
+      'Ещё чуть-чуть',
+      'Не спугни'
+    ],
+    'almost.foe': [
+      'Он почти всё снял. Не смотри туда',
+      'Пиздец подкрадывается незаметно'
+    ],
+    'slow.me': [
+      'Мы тут до утра сидеть будем?',
+      'Партия века, блядь',
+      'Кто-нибудь помнит, зачем мы начали?'
+    ],
+    'slow.foe': [
+      'Долгая партия. Чай хоть поставь',
+      'Играем уже вечность'
+    ],
+    'hint.me': [
+      'Подсказку смотришь? Совесть-то есть?',
+      'Ага, сам не можешь',
+      'Ладно, подскажу. Только никому'
+    ],
+    'undo.me': [
+      'Передумал? Так нечестно вообще-то',
+      'Э, ходы назад не берут',
+      'Ну ладно, ходи заново'
+    ],
+    'start.me': [
+      'Ну, поехали. Кости на стол',
+      'С Богом. И с шеш-бешем'
+    ],
+    'start.foe': [
+      'Ходи-ходи, посмотрим',
+      'Начинай, я подожду'
     ],
     'win.me': [
       'Всё, забирайте деньги. Партия наша',
-      'Вот так это и делается'
+      'Вот так это и делается',
+      'Ну что, кто тут в нарды играть не умеет?'
     ],
     'win.foe': [
       'Ладно, повезло. Ещё партию',
-      'Реванш. Немедленно'
+      'Реванш. Немедленно',
+      'Кости решили, не он'
     ],
     'mars.me': [
       'Марс! Позор на весь двор',
-      'Марс, дружище. Ни одной не снял'
+      'Марс, дружище. Ни одной не снял',
+      'Марс. Иди перепрятывай стыд'
     ],
     'mars.foe': [
-      'Марс словил. Ну и вечер, блядь'
+      'Марс словил. Ну и вечер, блядь',
+      'Марс. Даже сказать нечего'
     ]
   };
 
   var SOFT = {
-    'six.foe': [
-      'Опять шесть-шесть? Ну знаете',
-      'Так нечестно',
-      'Кости к нему неровно дышат'
-    ],
-    'six.me': [
-      'Шеш-беш! Вот это удача',
-      'Держите меня',
-      'Наконец-то'
-    ],
-    'double.foe': ['Снова дубль. Ну конечно', 'Да сколько можно?'],
-    'double.me': ['Дубль! Живём', 'Четыре хода. Красота'],
+    'six.foe': ['Опять шесть-шесть? Ну знаете', 'Так нечестно', 'Кости к нему неровно дышат',
+                'Ещё один шеш-беш, и я обижусь'],
+    'six.me': ['Шеш-беш! Вот это удача', 'Держите меня', 'Наконец-то', 'Шеш-беш. Не благодарите'],
+    'double.foe': ['Снова дубль. Ну конечно', 'Да сколько можно?', 'Везёт же людям'],
+    'double.me': ['Дубль! Живём', 'Четыре хода. Красота', 'Пошла масть'],
     'worst.me': ['Два-один. Спасибо, кости', 'Три очка за ход. Обидно'],
-    'worst.foe': ['Два-один. Так тебе и надо'],
+    'worst.foe': ['Два-один. Так тебе и надо', 'Посиди, подумай'],
     'stuck.me': ['Приехали. Хода нет', 'Пропускаю. Бывает'],
-    'stuck.foe': ['Что, некуда сходить? Сочувствую'],
+    'stuck.foe': ['Что, некуда сходить? Сочувствую', 'Застрял. Приятного вечера'],
     'off.me': ['Пошли домой, родные', 'Минус одна. Поехали'],
     'off.foe': ['Э, куда потащил?', 'Не спеши, ещё не вечер'],
-    'head.me': ['Голова не рассасывается. Пора шевелиться'],
+    'head.me': ['Голова не рассасывается. Пора шевелиться', 'Вся толпа так и сидит дома'],
+    'home.me': ['Все дома. Можно и разливать', 'Собрались, красавцы'],
+    'home.foe': ['Он уже дома. Плохо дело'],
+    'almost.me': ['Ещё чуть-чуть', 'Не спугни'],
+    'almost.foe': ['Он почти всё снял. Не смотри туда'],
+    'slow.me': ['Мы тут до утра сидеть будем?', 'Партия века'],
+    'slow.foe': ['Долгая партия. Чай хоть поставь'],
+    'hint.me': ['Подсказку смотришь? Ну-ну', 'Ладно, подскажу. Только никому'],
+    'undo.me': ['Передумал? Так нечестно', 'Ходы назад не берут'],
+    'start.me': ['Ну, поехали', 'С Богом. И с шеш-бешем'],
+    'start.foe': ['Ходи-ходи, посмотрим'],
     'win.me': ['Вот так это и делается', 'Партия наша'],
-    'win.foe': ['Ладно, повезло. Ещё партию'],
+    'win.foe': ['Ладно, повезло. Ещё партию', 'Реванш'],
     'mars.me': ['Марс! Полный разгром'],
     'mars.foe': ['Марс словил. Ну и вечер']
   };
 
-  var last = {};      /* чтобы одна и та же реплика не шла подряд */
-  var quiet = 0;      /* пауза между репликами */
+  var last = {};
+  var quiet = 0;
 
   function pick(mode, key) {
     var set = mode === 'soft' ? SOFT : HARD;
@@ -1771,12 +1958,11 @@ button { font: inherit; color: inherit; }
 
   /* Насколько часто событие вообще заслуживает реплики */
   var CHANCE = {
-    six: 1, double: 0.35, worst: 0.4, stuck: 1,
-    off: 0.22, head: 1, win: 1, mars: 1
+    six: 1, double: 0.32, worst: 0.4, stuck: 1, off: 0.2,
+    head: 1, home: 1, almost: 1, slow: 1, hint: 0.6, undo: 0.5,
+    start: 0.5, win: 1, mars: 1
   };
 
-  /* mode: 'hard' | 'soft' | 'off'; event: 'six', 'double', ...;
-     side: 'me' — событие у смотрящего, 'foe' — у соперника */
   function line(mode, event, side, force) {
     if (mode === 'off') return null;
     var now = Date.now();
@@ -1788,7 +1974,117 @@ button { font: inherit; color: inherit; }
     return text;
   }
 
-  global.NardyBanter = { line: line };
+  function reset() { quiet = 0; last = {}; }
+
+  global.NardyBanter = { line: line, reset: reset };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Telegram: приложение открывается внутри мессенджера.
+   Всё необязательное — если запущено просто в браузере, модуль
+   молча отвечает «нет».
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var BOT = '';        /* сюда имя бота, когда он будет: 'moinardy_bot' */
+  var APP = 'nardy';   /* короткое имя мини-приложения из @BotFather */
+
+  var W = global.Telegram && global.Telegram.WebApp ? global.Telegram.WebApp : null;
+  var on = !!(W && W.initData !== undefined && W.platform && W.platform !== 'unknown');
+
+  function ready() {
+    if (!on) return;
+    try {
+      W.ready();
+      W.expand();
+      if (W.disableVerticalSwipes) W.disableVerticalSwipes();   /* иначе перетаскивание шашки свернёт окно */
+      if (W.setHeaderColor) W.setHeaderColor('#0F1218');
+      if (W.setBackgroundColor) W.setBackgroundColor('#0F1218');
+      if (W.enableClosingConfirmation) W.enableClosingConfirmation();
+      document.documentElement.classList.add('tg');
+      if (W.platform === 'ios' || W.platform === 'android') {
+        document.documentElement.classList.add('tg-mobile');
+      }
+      /* На iOS высоту окна знает только сам Telegram — 100dvh там врёт */
+      applyHeight();
+      if (W.onEvent) {
+        W.onEvent('viewportChanged', applyHeight);
+        W.onEvent('themeChanged', applyHeight);
+      }
+    } catch (e) {}
+  }
+
+  function applyHeight() {
+    try {
+      var h = W.viewportStableHeight || W.viewportHeight;
+      if (h) document.documentElement.style.setProperty('--tgh', Math.round(h) + 'px');
+      window.dispatchEvent(new Event('resize'));
+    } catch (e) {}
+  }
+
+  /* Имя из профиля — чтобы не заставлять представляться */
+  function userName() {
+    try {
+      var u = W && W.initDataUnsafe && W.initDataUnsafe.user;
+      if (!u) return '';
+      return (u.first_name || u.username || '').slice(0, 18);
+    } catch (e) { return ''; }
+  }
+
+  function startParam() {
+    try {
+      var p = W && W.initDataUnsafe && W.initDataUnsafe.start_param;
+      return p ? String(p).toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+    } catch (e) { return ''; }
+  }
+
+  /* Отдача, ради которой всё и затевалось: доска отзывается на пальцы */
+  function buzz(kind) {
+    if (!on || !W.HapticFeedback) return;
+    try {
+      var h = W.HapticFeedback;
+      if (kind === 'move') h.impactOccurred('light');
+      else if (kind === 'off') h.impactOccurred('medium');
+      else if (kind === 'dice') h.impactOccurred('rigid');
+      else if (kind === 'win') h.notificationOccurred('success');
+      else if (kind === 'lose') h.notificationOccurred('warning');
+      else if (kind === 'no') h.notificationOccurred('error');
+      else if (kind === 'tap') h.selectionChanged();
+    } catch (e) {}
+  }
+
+  function deepLink(code) {
+    if (!BOT) return '';
+    return 'https://t.me/' + BOT + '/' + APP + '?startapp=' + code;
+  }
+
+  /* Приглашение уходит в чат Telegram, а не в буфер обмена */
+  function invite(code, text) {
+    var link = deepLink(code);
+    if (!on || !link) return false;
+    try {
+      W.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(link) +
+        '&text=' + encodeURIComponent(text || 'Партию в нарды?'));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function close() { if (on) { try { W.close(); } catch (e) {} } }
+
+  global.NardyTG = {
+    on: on,
+    bot: function () { return BOT; },
+    ready: ready,
+    userName: userName,
+    startParam: startParam,
+    buzz: buzz,
+    deepLink: deepLink,
+    invite: invite,
+    close: close,
+    platform: on ? W.platform : ''
+  };
 })(window);
 </script>
 <script>
@@ -2128,7 +2424,7 @@ button { font: inherit; color: inherit; }
   var N = window.Nardy, B = window.NardyBoard, AI = window.NardyAI;
   var $ = function (id) { return document.getElementById(id); };
 
-  var board = $('board'), scene = $('scene');
+  var board = $('board'), scene = $('scene'), stage = $('stage');
   var lZones = $('zones'), lMen = $('men'), lSpots = $('spots'), lDice = $('dice');
 
   var S = null;              /* состояние партии */
@@ -2194,7 +2490,7 @@ button { font: inherit; color: inherit; }
     toss: null
   };
   var lobbyOff = null;
-  var banterHead = false;   /* подкол про засидевшуюся голову — один раз за партию */
+  var bf = {};              /* какие подколы за партию уже прозвучали */
 
   function isNet() { return opts.mode === 'net' && !!net.code; }
 
@@ -2204,6 +2500,8 @@ button { font: inherit; color: inherit; }
   }
 
   function readInvite() {
+    var p = NardyTG.startParam();
+    if (p && p.length >= 4 && p.length <= 8) return p;
     var m = /[#?&]stol=([A-Za-z0-9]{4,8})/.exec(location.hash + location.search);
     return m ? m[1].toUpperCase() : null;
   }
@@ -2274,6 +2572,7 @@ button { font: inherit; color: inherit; }
   }
 
   function sfx(kind) {
+    NardyTG.buzz(kind);
     if (!opts.sound) return;
     try {
       if (kind === 'move') { noise(0.05, 2400, 1.2, 0.16); tone(220, 0.07, 0.05, 0, 'square'); }
@@ -2292,28 +2591,29 @@ button { font: inherit; color: inherit; }
 
   /* ---------- построение доски ---------- */
 
+  function box(el, r) {
+    var q = B.map(r.x, r.y, r.w, r.h);
+    el.style.left = (q.x / B.vw() * 100) + '%';
+    el.style.top = (q.y / B.vh() * 100) + '%';
+    el.style.width = (q.w / B.vw() * 100) + '%';
+    el.style.height = (q.h / B.vh() * 100) + '%';
+  }
+
   function buildZones() {
     lZones.innerHTML = '';
     for (var i = 0; i < 24; i++) {
       var g = B.geom(i), z = document.createElement('div');
       z.className = 'zone';
       z.dataset.i = i;
-      z.dataset.row = g.top ? 'top' : 'bottom';
-      z.style.left = (g.x / B.VW * 100) + '%';
-      z.style.top = (g.y / B.VH * 100) + '%';
-      z.style.width = (g.w / B.VW * 100) + '%';
-      z.style.height = (g.h / B.VH * 100) + '%';
+      box(z, g);
       lZones.appendChild(z);
     }
     /* лотки: бросить шашку в лоток = снять её с доски */
     ['w', 'b'].forEach(function (p) {
-      var t = B.trayBox(p), e = document.createElement('div');
+      var e = document.createElement('div');
       e.className = 'zone tray';
       e.dataset.tray = p;
-      e.style.left = (t.x / B.VW * 100) + '%';
-      e.style.top = (t.y / B.VH * 100) + '%';
-      e.style.width = (t.w / B.VW * 100) + '%';
-      e.style.height = (t.h / B.VH * 100) + '%';
+      box(e, B.trayBox(p));
       lZones.appendChild(e);
     });
   }
@@ -2325,6 +2625,7 @@ button { font: inherit; color: inherit; }
       for (var i = 0; i < N.NC; i++) {
         var e = document.createElement('div');
         e.className = 'man ' + p;
+        e.style.backgroundImage = 'url(' + B.checker(p, 176) + ')';
         e.dataset.id = p + i;
         lMen.appendChild(e);
         men[p + i] = e;
@@ -2354,7 +2655,33 @@ button { font: inherit; color: inherit; }
     return v;
   }
 
-  function scale() { return board.clientWidth / B.VW; }
+  /* Доска занимает всё, что осталось от экрана; на телефоне встаёт вертикально */
+  function fit() {
+    var tall = window.innerWidth < window.innerHeight * 0.95;
+    if (tall !== B.isTall()) { B.setTall(tall); buildZones(); }
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    var ar = B.vw() / B.vh();
+    if (w / h > ar) w = h * ar; else h = w / ar;
+    board.style.width = Math.floor(w) + 'px';
+    board.style.height = Math.floor(h) + 'px';
+  }
+
+  /* Свой цвет всегда снизу — как за настоящим столом */
+  function setSides() {
+    var my = isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : 'w');
+    $('pl-w').style.order = my === 'b' ? '0' : '2';
+    $('pl-b').style.order = my === 'b' ? '2' : '0';
+    stage.style.order = '1';
+  }
+
+  function scale() { return board.clientWidth / B.vw(); }
+
+  /* из координат доски — в экранные пиксели с учётом разворота */
+  function px(x, y, size, k) {
+    var q = B.map(x, y, size, size);
+    return { x: q.x * k, y: q.y * k };
+  }
 
   function setT(id, x, y, extra) {
     pos[id] = { x: x, y: y };
@@ -2376,27 +2703,27 @@ button { font: inherit; color: inherit; }
     for (i = 0; i < 24; i++) {
       ids = VIS.pts[i]; n = ids.length;
       for (j = 0; j < n; j++) {
-        p = B.manAt(i, j, n);
+        p = px(B.manAt(i, j, n).x, B.manAt(i, j, n).y, B.CD, k);
         var lift = (sel === i && j === n - 1) ? ' scale(1.06)' : '';
-        setT(ids[j], p.x * k, p.y * k, lift);
+        setT(ids[j], p.x, p.y, lift);
         men[ids[j]].style.zIndex = 1 + j;
         men[ids[j]].classList.toggle('pick', sel === i && j === n - 1);
       }
       var tg = tags[i];
       if (n > 5) {
-        var top = B.manAt(i, n - 1, n);
+        var top = px(B.manAt(i, n - 1, n).x, B.manAt(i, n - 1, n).y, B.CD, k);
         tg.style.display = '';
         tg.textContent = n;
-        tg.style.transform = 'translate3d(' + (top.x * k).toFixed(1) + 'px,' +
-          (top.y * k + B.CD * k * 0.32).toFixed(1) + 'px,0)';
+        tg.style.transform = 'translate3d(' + top.x.toFixed(1) + 'px,' +
+          (top.y + B.CD * k * 0.32).toFixed(1) + 'px,0)';
         tg.className = 'tag' + (VIS.pts[i][0][0] === 'b' ? ' on-dark' : '');
       } else tg.style.display = 'none';
     }
 
     ['w', 'b'].forEach(function (pl) {
       VIS.off[pl].forEach(function (mid, idx) {
-        var q = B.trayAt(pl, idx);
-        setT(mid, q.x * k, q.y * k);
+        var t = B.trayAt(pl, idx), q = px(t.x, t.y, B.CD, k);
+        setT(mid, q.x, q.y);
         men[mid].style.zIndex = 1 + idx;
       });
     });
@@ -2428,32 +2755,18 @@ button { font: inherit; color: inherit; }
 
   /* ---------- кости ---------- */
 
-  var PIPS = {
-    1: [[50, 50]],
-    2: [[26, 26], [74, 74]],
-    3: [[26, 26], [50, 50], [74, 74]],
-    4: [[26, 26], [74, 26], [26, 74], [74, 74]],
-    5: [[26, 26], [74, 26], [50, 50], [26, 74], [74, 74]],
-    6: [[26, 24], [74, 24], [26, 50], [74, 50], [26, 76], [74, 76]]
-  };
-
   /* Кость лежит в обёртке: обёртка задаёт место, анимация крутит саму кость */
   function dieEl(value, dark, used, x, y, delay) {
     var wrap = document.createElement('div');
     wrap.className = 'die-wrap';
     wrap.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
     var d = document.createElement('div');
-    d.className = 'die' + (dark ? ' dark' : '') + (used ? ' used' : '');
+    d.className = 'die' + (used ? ' used' : '');
+    d.style.backgroundImage = 'url(' + B.die(dark ? 'b' : 'w', value, 132) + ')';
     if (delay !== null) {
       d.style.animationDelay = delay + 'ms';
       d.classList.add('tumble');
     }
-    PIPS[value].forEach(function (c) {
-      var i = document.createElement('i');
-      i.style.left = (c[0] - 8.5) + '%';
-      i.style.top = (c[1] - 8.5) + '%';
-      d.appendChild(i);
-    });
     wrap.appendChild(d);
     return wrap;
   }
@@ -2467,8 +2780,8 @@ button { font: inherit; color: inherit; }
     vals.forEach(function (v, idx) {
       var used = true, at = left.indexOf(v);
       if (at >= 0) { used = false; left.splice(at, 1); }
-      var q = B.diceAt(S.turn, idx, vals.length);
-      lDice.appendChild(dieEl(v, S.turn === 'b', used, q.x * k, q.y * k, animate ? idx * 45 : null));
+      var d = B.diceAt(S.turn, idx, vals.length), q = px(d.x, d.y, B.DD, k);
+      lDice.appendChild(dieEl(v, S.turn === 'b', used, q.x, q.y, animate ? idx * 45 : null));
     });
   }
 
@@ -2477,8 +2790,8 @@ button { font: inherit; color: inherit; }
     lDice.innerHTML = '';
     var k = scale();
     [['w', a], ['b', b]].forEach(function (pair) {
-      var q = B.diceAt(pair[0], 0, 1);
-      lDice.appendChild(dieEl(pair[1], pair[0] === 'b', false, q.x * k, q.y * k, 0));
+      var d = B.diceAt(pair[0], 0, 1), q = px(d.x, d.y, B.DD, k);
+      lDice.appendChild(dieEl(pair[1], pair[0] === 'b', false, q.x, q.y, 0));
     });
   }
 
@@ -2502,12 +2815,13 @@ button { font: inherit; color: inherit; }
         n = VIS.pts[m.to].length + 1;
         q = B.manAt(m.to, n - 1, n);
       }
+      q = px(q.x, q.y, B.CD, k);
       var s = document.createElement('div');
       s.className = 'spot';
       s.dataset.to = m.to;
       s.dataset.die = m.die;
       s.innerHTML = '<em>' + m.die + '</em>';
-      s.style.transform = 'translate3d(' + (q.x * k).toFixed(1) + 'px,' + (q.y * k).toFixed(1) + 'px,0)';
+      s.style.transform = 'translate3d(' + q.x.toFixed(1) + 'px,' + q.y.toFixed(1) + 'px,0)';
       lSpots.appendChild(s);
     });
   }
@@ -2567,6 +2881,7 @@ button { font: inherit; color: inherit; }
     var my = canPlay();
     $('act-undo').disabled = !(my && undoStack.length);
     $('act-hint').disabled = !(my && legal.length);
+    setSides();
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
     $('act-sound').textContent = opts.sound ? '♪' : '✕';
     $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
@@ -2633,6 +2948,7 @@ button { font: inherit; color: inherit; }
 
   function undo() {
     if (!undoStack.length) return;
+    quip('undo', S.turn);
     var s = undoStack.pop();
     S = s.st;
     VIS = s.vis;
@@ -2681,13 +2997,7 @@ button { font: inherit; color: inherit; }
     updateUI();
     persist();
     pushTable();
-    if (d1 === d2) quip(d1 === 6 ? 'six' : 'double', S.turn, d1 === 6);
-    else if (d1 + d2 === 3) quip('worst', S.turn);
-    else if (S.turnNo[S.turn] >= 8 && N.cnt(S, N.HEAD[S.turn], S.turn) >= 10 &&
-             sideOf(S.turn) === 'me' && !banterHead) {
-      banterHead = true;
-      quip('head', S.turn);
-    }
+    banter(d1, d2);
     if (!legal.length) {
       toast(nameOf(S.turn) + ': ходов нет');
       sfx('no');
@@ -2697,6 +3007,25 @@ button { font: inherit; color: inherit; }
     }
     if (isAI(S.turn)) later(700, aiTurn);
     else { busy = false; markLive(); updateUI(); }
+  }
+
+  /* Кто-то за столом обязательно прокомментирует бросок */
+  function banter(d1, d2) {
+    var p = S.turn;
+    if (!S.turnNo.w && !S.turnNo.b) quip('start', p);
+    if (d1 === d2) quip(d1 === 6 ? 'six' : 'double', p, d1 === 6);
+    else if (d1 + d2 === 3) quip('worst', p);
+
+    if (!bf['home' + p] && N.allHome(S, p) && S.off[p] < 12) {
+      bf['home' + p] = true; quip('home', p);
+    } else if (!bf['almost' + p] && S.off[p] >= 12) {
+      bf['almost' + p] = true; quip('almost', p);
+    } else if (!bf.slow && S.turnNo.w + S.turnNo.b >= 90) {
+      bf.slow = true; quip('slow', p);
+    } else if (!bf.head && S.turnNo[p] >= 8 && N.cnt(S, N.HEAD[p], p) >= 10 &&
+               sideOf(p) === 'me') {
+      bf.head = true; quip('head', p);
+    }
   }
 
   function aiTurn() {
@@ -2775,14 +3104,10 @@ button { font: inherit; color: inherit; }
     try { lZones.setPointerCapture(e.pointerId); } catch (err) {}
   }
 
-  /* В портретном режиме доска повёрнута — сдвиг пальца надо развернуть тоже */
-  var rotQuery = window.matchMedia('(max-width: 700px) and (orientation: portrait)');
-
   function onMove(e) {
     if (!drag) return;
-    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0, t;
+    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 7) return;
-    if (rotQuery.matches) { t = dx; dx = dy; dy = -t; }
     drag.moved = true;
     var el = men[drag.id], p = pos[drag.id];
     el.style.transition = 'none';
@@ -2820,6 +3145,7 @@ button { font: inherit; color: inherit; }
     if (!canPlay() || !legal.length) return;
     var path = AI.choose(S, 'hard');
     if (!path.length) return;
+    quip('hint', S.turn);
     var mv = path[0];
     pick(mv.from);
     var ids = VIS.pts[mv.from];
@@ -3067,7 +3393,7 @@ button { font: inherit; color: inherit; }
     var t = toss(), st = N.create();
     st.turn = t.turn;
     net.shown = false;
-    banterHead = false;
+    bf = {}; NardyBanter.reset();
     hushQuip();
     net.toss = null;
     closeSheet();
@@ -3250,6 +3576,10 @@ button { font: inherit; color: inherit; }
       '<p class="hint" style="text-align:center">' +
       (waiting ? 'Ждём соперника…' : 'Вы играете ' + (net.seat === 'w' ? 'белыми' : 'чёрными')) + '</p>' +
       /* внутри артефакта страница живёт в песочнице — её адрес сопернику не отдать */
+      (NardyTG.on && NardyTG.bot()
+        ? '<div class="sheet-actions" style="margin-top:14px">' +
+          '<button class="btn btn-key" type="button" data-act="net-share">Позвать в чат</button></div>'
+        : '') +
       (NardyNet.kind() === 'db' ? '' :
         '<div class="field"><label>Ссылка-приглашение</label><div class="row">' +
         '<input class="inp" id="net-link" readonly value="' + esc(shareLink()) + '">' +
@@ -3348,7 +3678,7 @@ button { font: inherit; color: inherit; }
   function newGame() {
     closeSheet();
     hushQuip();
-    banterHead = false;
+    bf = {}; NardyBanter.reset();
     forget();
     S = N.create();
     VIS = visFrom(S);
@@ -3384,7 +3714,6 @@ button { font: inherit; color: inherit; }
   lSpots.addEventListener('pointerdown', onDown);
 
   $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : setupSheet(); });
-  $('act-rules').addEventListener('click', rulesSheet);
   $('act-undo').addEventListener('click', function () { undo(); });
   $('act-hint').addEventListener('click', hint);
   $('act-sound').addEventListener('click', function () {
@@ -3415,6 +3744,9 @@ button { font: inherit; color: inherit; }
     else if (act === 'net-sit') { saveName(); sitDown(e.target.dataset.code); }
     else if (act === 'net-join') { saveName(); sitDown($('net-code') ? $('net-code').value : ''); }
     else if (act === 'net-quit') quitTable();
+    else if (act === 'net-share') {
+      if (!NardyTG.invite(net.code, 'Партию в нарды? Стол ' + net.code)) toast('Не вышло открыть чат');
+    }
     else if (act === 'net-copy') {
       var f = $('net-link');
       if (f) {
@@ -3440,13 +3772,17 @@ button { font: inherit; color: inherit; }
 
   var rt;
   function onResize() {
+    fit();
     B.render(scene);
     if (VIS) place(true);
   }
-  window.addEventListener('resize', function () {
+  function bumpResize() {
     clearTimeout(rt);
     rt = setTimeout(onResize, 120);
-  });
+  }
+  window.addEventListener('resize', bumpResize);
+  window.addEventListener('orientationchange', bumpResize);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', bumpResize);
 
   /* ---------- старт ---------- */
 
@@ -3456,6 +3792,15 @@ button { font: inherit; color: inherit; }
              isNet: isNet(), status: net.table && net.table.status };
   };
 
+  NardyTG.ready();
+  if (!NardyNet.name() && NardyTG.userName()) NardyNet.rename(NardyTG.userName());
+  ['w', 'b'].forEach(function (p) {
+    Array.prototype.forEach.call(document.querySelectorAll('.disc.' + p), function (d) {
+      d.style.backgroundImage = 'url(' + B.checker(p, 96) + ')';
+    });
+  });
+
+  fit();
   buildZones();
   B.render(scene);
   if (document.fonts && document.fonts.ready) {

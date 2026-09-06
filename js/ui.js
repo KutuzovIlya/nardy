@@ -7,7 +7,7 @@
   var N = window.Nardy, B = window.NardyBoard, AI = window.NardyAI;
   var $ = function (id) { return document.getElementById(id); };
 
-  var board = $('board'), scene = $('scene');
+  var board = $('board'), scene = $('scene'), stage = $('stage');
   var lZones = $('zones'), lMen = $('men'), lSpots = $('spots'), lDice = $('dice');
 
   var S = null;              /* состояние партии */
@@ -73,7 +73,7 @@
     toss: null
   };
   var lobbyOff = null;
-  var banterHead = false;   /* подкол про засидевшуюся голову — один раз за партию */
+  var bf = {};              /* какие подколы за партию уже прозвучали */
 
   function isNet() { return opts.mode === 'net' && !!net.code; }
 
@@ -83,6 +83,8 @@
   }
 
   function readInvite() {
+    var p = NardyTG.startParam();
+    if (p && p.length >= 4 && p.length <= 8) return p;
     var m = /[#?&]stol=([A-Za-z0-9]{4,8})/.exec(location.hash + location.search);
     return m ? m[1].toUpperCase() : null;
   }
@@ -153,6 +155,7 @@
   }
 
   function sfx(kind) {
+    NardyTG.buzz(kind);
     if (!opts.sound) return;
     try {
       if (kind === 'move') { noise(0.05, 2400, 1.2, 0.16); tone(220, 0.07, 0.05, 0, 'square'); }
@@ -171,28 +174,29 @@
 
   /* ---------- построение доски ---------- */
 
+  function box(el, r) {
+    var q = B.map(r.x, r.y, r.w, r.h);
+    el.style.left = (q.x / B.vw() * 100) + '%';
+    el.style.top = (q.y / B.vh() * 100) + '%';
+    el.style.width = (q.w / B.vw() * 100) + '%';
+    el.style.height = (q.h / B.vh() * 100) + '%';
+  }
+
   function buildZones() {
     lZones.innerHTML = '';
     for (var i = 0; i < 24; i++) {
       var g = B.geom(i), z = document.createElement('div');
       z.className = 'zone';
       z.dataset.i = i;
-      z.dataset.row = g.top ? 'top' : 'bottom';
-      z.style.left = (g.x / B.VW * 100) + '%';
-      z.style.top = (g.y / B.VH * 100) + '%';
-      z.style.width = (g.w / B.VW * 100) + '%';
-      z.style.height = (g.h / B.VH * 100) + '%';
+      box(z, g);
       lZones.appendChild(z);
     }
     /* лотки: бросить шашку в лоток = снять её с доски */
     ['w', 'b'].forEach(function (p) {
-      var t = B.trayBox(p), e = document.createElement('div');
+      var e = document.createElement('div');
       e.className = 'zone tray';
       e.dataset.tray = p;
-      e.style.left = (t.x / B.VW * 100) + '%';
-      e.style.top = (t.y / B.VH * 100) + '%';
-      e.style.width = (t.w / B.VW * 100) + '%';
-      e.style.height = (t.h / B.VH * 100) + '%';
+      box(e, B.trayBox(p));
       lZones.appendChild(e);
     });
   }
@@ -204,6 +208,7 @@
       for (var i = 0; i < N.NC; i++) {
         var e = document.createElement('div');
         e.className = 'man ' + p;
+        e.style.backgroundImage = 'url(' + B.checker(p, 176) + ')';
         e.dataset.id = p + i;
         lMen.appendChild(e);
         men[p + i] = e;
@@ -233,7 +238,33 @@
     return v;
   }
 
-  function scale() { return board.clientWidth / B.VW; }
+  /* Доска занимает всё, что осталось от экрана; на телефоне встаёт вертикально */
+  function fit() {
+    var tall = window.innerWidth < window.innerHeight * 0.95;
+    if (tall !== B.isTall()) { B.setTall(tall); buildZones(); }
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    var ar = B.vw() / B.vh();
+    if (w / h > ar) w = h * ar; else h = w / ar;
+    board.style.width = Math.floor(w) + 'px';
+    board.style.height = Math.floor(h) + 'px';
+  }
+
+  /* Свой цвет всегда снизу — как за настоящим столом */
+  function setSides() {
+    var my = isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : 'w');
+    $('pl-w').style.order = my === 'b' ? '0' : '2';
+    $('pl-b').style.order = my === 'b' ? '2' : '0';
+    stage.style.order = '1';
+  }
+
+  function scale() { return board.clientWidth / B.vw(); }
+
+  /* из координат доски — в экранные пиксели с учётом разворота */
+  function px(x, y, size, k) {
+    var q = B.map(x, y, size, size);
+    return { x: q.x * k, y: q.y * k };
+  }
 
   function setT(id, x, y, extra) {
     pos[id] = { x: x, y: y };
@@ -255,27 +286,27 @@
     for (i = 0; i < 24; i++) {
       ids = VIS.pts[i]; n = ids.length;
       for (j = 0; j < n; j++) {
-        p = B.manAt(i, j, n);
+        p = px(B.manAt(i, j, n).x, B.manAt(i, j, n).y, B.CD, k);
         var lift = (sel === i && j === n - 1) ? ' scale(1.06)' : '';
-        setT(ids[j], p.x * k, p.y * k, lift);
+        setT(ids[j], p.x, p.y, lift);
         men[ids[j]].style.zIndex = 1 + j;
         men[ids[j]].classList.toggle('pick', sel === i && j === n - 1);
       }
       var tg = tags[i];
       if (n > 5) {
-        var top = B.manAt(i, n - 1, n);
+        var top = px(B.manAt(i, n - 1, n).x, B.manAt(i, n - 1, n).y, B.CD, k);
         tg.style.display = '';
         tg.textContent = n;
-        tg.style.transform = 'translate3d(' + (top.x * k).toFixed(1) + 'px,' +
-          (top.y * k + B.CD * k * 0.32).toFixed(1) + 'px,0)';
+        tg.style.transform = 'translate3d(' + top.x.toFixed(1) + 'px,' +
+          (top.y + B.CD * k * 0.32).toFixed(1) + 'px,0)';
         tg.className = 'tag' + (VIS.pts[i][0][0] === 'b' ? ' on-dark' : '');
       } else tg.style.display = 'none';
     }
 
     ['w', 'b'].forEach(function (pl) {
       VIS.off[pl].forEach(function (mid, idx) {
-        var q = B.trayAt(pl, idx);
-        setT(mid, q.x * k, q.y * k);
+        var t = B.trayAt(pl, idx), q = px(t.x, t.y, B.CD, k);
+        setT(mid, q.x, q.y);
         men[mid].style.zIndex = 1 + idx;
       });
     });
@@ -307,32 +338,18 @@
 
   /* ---------- кости ---------- */
 
-  var PIPS = {
-    1: [[50, 50]],
-    2: [[26, 26], [74, 74]],
-    3: [[26, 26], [50, 50], [74, 74]],
-    4: [[26, 26], [74, 26], [26, 74], [74, 74]],
-    5: [[26, 26], [74, 26], [50, 50], [26, 74], [74, 74]],
-    6: [[26, 24], [74, 24], [26, 50], [74, 50], [26, 76], [74, 76]]
-  };
-
   /* Кость лежит в обёртке: обёртка задаёт место, анимация крутит саму кость */
   function dieEl(value, dark, used, x, y, delay) {
     var wrap = document.createElement('div');
     wrap.className = 'die-wrap';
     wrap.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
     var d = document.createElement('div');
-    d.className = 'die' + (dark ? ' dark' : '') + (used ? ' used' : '');
+    d.className = 'die' + (used ? ' used' : '');
+    d.style.backgroundImage = 'url(' + B.die(dark ? 'b' : 'w', value, 132) + ')';
     if (delay !== null) {
       d.style.animationDelay = delay + 'ms';
       d.classList.add('tumble');
     }
-    PIPS[value].forEach(function (c) {
-      var i = document.createElement('i');
-      i.style.left = (c[0] - 8.5) + '%';
-      i.style.top = (c[1] - 8.5) + '%';
-      d.appendChild(i);
-    });
     wrap.appendChild(d);
     return wrap;
   }
@@ -346,8 +363,8 @@
     vals.forEach(function (v, idx) {
       var used = true, at = left.indexOf(v);
       if (at >= 0) { used = false; left.splice(at, 1); }
-      var q = B.diceAt(S.turn, idx, vals.length);
-      lDice.appendChild(dieEl(v, S.turn === 'b', used, q.x * k, q.y * k, animate ? idx * 45 : null));
+      var d = B.diceAt(S.turn, idx, vals.length), q = px(d.x, d.y, B.DD, k);
+      lDice.appendChild(dieEl(v, S.turn === 'b', used, q.x, q.y, animate ? idx * 45 : null));
     });
   }
 
@@ -356,8 +373,8 @@
     lDice.innerHTML = '';
     var k = scale();
     [['w', a], ['b', b]].forEach(function (pair) {
-      var q = B.diceAt(pair[0], 0, 1);
-      lDice.appendChild(dieEl(pair[1], pair[0] === 'b', false, q.x * k, q.y * k, 0));
+      var d = B.diceAt(pair[0], 0, 1), q = px(d.x, d.y, B.DD, k);
+      lDice.appendChild(dieEl(pair[1], pair[0] === 'b', false, q.x, q.y, 0));
     });
   }
 
@@ -381,12 +398,13 @@
         n = VIS.pts[m.to].length + 1;
         q = B.manAt(m.to, n - 1, n);
       }
+      q = px(q.x, q.y, B.CD, k);
       var s = document.createElement('div');
       s.className = 'spot';
       s.dataset.to = m.to;
       s.dataset.die = m.die;
       s.innerHTML = '<em>' + m.die + '</em>';
-      s.style.transform = 'translate3d(' + (q.x * k).toFixed(1) + 'px,' + (q.y * k).toFixed(1) + 'px,0)';
+      s.style.transform = 'translate3d(' + q.x.toFixed(1) + 'px,' + q.y.toFixed(1) + 'px,0)';
       lSpots.appendChild(s);
     });
   }
@@ -446,6 +464,7 @@
     var my = canPlay();
     $('act-undo').disabled = !(my && undoStack.length);
     $('act-hint').disabled = !(my && legal.length);
+    setSides();
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
     $('act-sound').textContent = opts.sound ? '♪' : '✕';
     $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
@@ -512,6 +531,7 @@
 
   function undo() {
     if (!undoStack.length) return;
+    quip('undo', S.turn);
     var s = undoStack.pop();
     S = s.st;
     VIS = s.vis;
@@ -560,13 +580,7 @@
     updateUI();
     persist();
     pushTable();
-    if (d1 === d2) quip(d1 === 6 ? 'six' : 'double', S.turn, d1 === 6);
-    else if (d1 + d2 === 3) quip('worst', S.turn);
-    else if (S.turnNo[S.turn] >= 8 && N.cnt(S, N.HEAD[S.turn], S.turn) >= 10 &&
-             sideOf(S.turn) === 'me' && !banterHead) {
-      banterHead = true;
-      quip('head', S.turn);
-    }
+    banter(d1, d2);
     if (!legal.length) {
       toast(nameOf(S.turn) + ': ходов нет');
       sfx('no');
@@ -576,6 +590,25 @@
     }
     if (isAI(S.turn)) later(700, aiTurn);
     else { busy = false; markLive(); updateUI(); }
+  }
+
+  /* Кто-то за столом обязательно прокомментирует бросок */
+  function banter(d1, d2) {
+    var p = S.turn;
+    if (!S.turnNo.w && !S.turnNo.b) quip('start', p);
+    if (d1 === d2) quip(d1 === 6 ? 'six' : 'double', p, d1 === 6);
+    else if (d1 + d2 === 3) quip('worst', p);
+
+    if (!bf['home' + p] && N.allHome(S, p) && S.off[p] < 12) {
+      bf['home' + p] = true; quip('home', p);
+    } else if (!bf['almost' + p] && S.off[p] >= 12) {
+      bf['almost' + p] = true; quip('almost', p);
+    } else if (!bf.slow && S.turnNo.w + S.turnNo.b >= 90) {
+      bf.slow = true; quip('slow', p);
+    } else if (!bf.head && S.turnNo[p] >= 8 && N.cnt(S, N.HEAD[p], p) >= 10 &&
+               sideOf(p) === 'me') {
+      bf.head = true; quip('head', p);
+    }
   }
 
   function aiTurn() {
@@ -654,14 +687,10 @@
     try { lZones.setPointerCapture(e.pointerId); } catch (err) {}
   }
 
-  /* В портретном режиме доска повёрнута — сдвиг пальца надо развернуть тоже */
-  var rotQuery = window.matchMedia('(max-width: 700px) and (orientation: portrait)');
-
   function onMove(e) {
     if (!drag) return;
-    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0, t;
+    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 7) return;
-    if (rotQuery.matches) { t = dx; dx = dy; dy = -t; }
     drag.moved = true;
     var el = men[drag.id], p = pos[drag.id];
     el.style.transition = 'none';
@@ -699,6 +728,7 @@
     if (!canPlay() || !legal.length) return;
     var path = AI.choose(S, 'hard');
     if (!path.length) return;
+    quip('hint', S.turn);
     var mv = path[0];
     pick(mv.from);
     var ids = VIS.pts[mv.from];
@@ -946,7 +976,7 @@
     var t = toss(), st = N.create();
     st.turn = t.turn;
     net.shown = false;
-    banterHead = false;
+    bf = {}; NardyBanter.reset();
     hushQuip();
     net.toss = null;
     closeSheet();
@@ -1129,6 +1159,10 @@
       '<p class="hint" style="text-align:center">' +
       (waiting ? 'Ждём соперника…' : 'Вы играете ' + (net.seat === 'w' ? 'белыми' : 'чёрными')) + '</p>' +
       /* внутри артефакта страница живёт в песочнице — её адрес сопернику не отдать */
+      (NardyTG.on && NardyTG.bot()
+        ? '<div class="sheet-actions" style="margin-top:14px">' +
+          '<button class="btn btn-key" type="button" data-act="net-share">Позвать в чат</button></div>'
+        : '') +
       (NardyNet.kind() === 'db' ? '' :
         '<div class="field"><label>Ссылка-приглашение</label><div class="row">' +
         '<input class="inp" id="net-link" readonly value="' + esc(shareLink()) + '">' +
@@ -1227,7 +1261,7 @@
   function newGame() {
     closeSheet();
     hushQuip();
-    banterHead = false;
+    bf = {}; NardyBanter.reset();
     forget();
     S = N.create();
     VIS = visFrom(S);
@@ -1263,7 +1297,6 @@
   lSpots.addEventListener('pointerdown', onDown);
 
   $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : setupSheet(); });
-  $('act-rules').addEventListener('click', rulesSheet);
   $('act-undo').addEventListener('click', function () { undo(); });
   $('act-hint').addEventListener('click', hint);
   $('act-sound').addEventListener('click', function () {
@@ -1294,6 +1327,9 @@
     else if (act === 'net-sit') { saveName(); sitDown(e.target.dataset.code); }
     else if (act === 'net-join') { saveName(); sitDown($('net-code') ? $('net-code').value : ''); }
     else if (act === 'net-quit') quitTable();
+    else if (act === 'net-share') {
+      if (!NardyTG.invite(net.code, 'Партию в нарды? Стол ' + net.code)) toast('Не вышло открыть чат');
+    }
     else if (act === 'net-copy') {
       var f = $('net-link');
       if (f) {
@@ -1319,13 +1355,17 @@
 
   var rt;
   function onResize() {
+    fit();
     B.render(scene);
     if (VIS) place(true);
   }
-  window.addEventListener('resize', function () {
+  function bumpResize() {
     clearTimeout(rt);
     rt = setTimeout(onResize, 120);
-  });
+  }
+  window.addEventListener('resize', bumpResize);
+  window.addEventListener('orientationchange', bumpResize);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', bumpResize);
 
   /* ---------- старт ---------- */
 
@@ -1335,6 +1375,15 @@
              isNet: isNet(), status: net.table && net.table.status };
   };
 
+  NardyTG.ready();
+  if (!NardyNet.name() && NardyTG.userName()) NardyNet.rename(NardyTG.userName());
+  ['w', 'b'].forEach(function (p) {
+    Array.prototype.forEach.call(document.querySelectorAll('.disc.' + p), function (d) {
+      d.style.backgroundImage = 'url(' + B.checker(p, 96) + ')';
+    });
+  });
+
+  fit();
   buildZones();
   B.render(scene);
   if (document.fonts && document.fonts.ready) {

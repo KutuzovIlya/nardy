@@ -1,59 +1,24 @@
 /* ============================================================
-   Нарды — оформление
-   Палитра: ореховая доска с латунной инкрустацией на тёмном
-   столе. Акцент — латунь, всё остальное приглушено.
+   Нарды. Свёрстано под телефон: экран делится на три полосы —
+   соперник сверху, доска посередине во всю оставшуюся высоту,
+   вы снизу. На большом экране раскладка та же, просто шире.
    ============================================================ */
 
 :root {
-  --bg:        #EFE8DA;
-  --bg-deep:   #E0D5C0;
-  --panel:     #FAF6EE;
-  --panel-2:   #F2EADA;
-  --line:      rgba(74, 56, 32, .18);
-  --line-soft: rgba(74, 56, 32, .10);
-  --text:      #2B2318;
-  --text-dim:  #6E6050;
-  --brass:     #8A6716;
-  --brass-lit: #B08A2E;
-  --felt:      #14514A;
-  --oxblood:   #7B2E26;
-  --shadow-lg: 0 30px 70px -30px rgba(40, 28, 12, .45);
-  --shadow-sm: 0 2px 10px rgba(40, 28, 12, .14);
-  --radius:    14px;
-  --move-dur:  380ms;
-  --ease:      cubic-bezier(.22, .68, .36, 1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg:        #10131A;
-    --bg-deep:   #070910;
-    --panel:     #181C25;
-    --panel-2:   #1F242F;
-    --line:      rgba(200, 162, 74, .18);
-    --line-soft: rgba(200, 162, 74, .09);
-    --text:      #EBE3D3;
-    --text-dim:  #968D7C;
-    --brass:     #C8A24A;
-    --brass-lit: #E5C97F;
-    --shadow-lg: 0 40px 90px -35px rgba(0, 0, 0, .9);
-    --shadow-sm: 0 2px 12px rgba(0, 0, 0, .5);
-  }
-}
-
-:root[data-theme="dark"] {
-  --bg:        #10131A;
-  --bg-deep:   #070910;
-  --panel:     #181C25;
+  --bg:        #0F1218;
+  --bg-deep:   #06080D;
+  --panel:     #171B24;
   --panel-2:   #1F242F;
   --line:      rgba(200, 162, 74, .18);
-  --line-soft: rgba(200, 162, 74, .09);
   --text:      #EBE3D3;
   --text-dim:  #968D7C;
   --brass:     #C8A24A;
   --brass-lit: #E5C97F;
   --shadow-lg: 0 40px 90px -35px rgba(0, 0, 0, .9);
-  --shadow-sm: 0 2px 12px rgba(0, 0, 0, .5);
+  --radius:    14px;
+  --move-dur:  360ms;
+  --ease:      cubic-bezier(.22, .68, .36, 1);
+  --gap:       10px;
 }
 
 * { box-sizing: border-box; }
@@ -62,16 +27,16 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
-  overflow-x: hidden;
-  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
   background: var(--bg);
-  background-image: radial-gradient(120% 90% at 50% -10%, var(--bg) 0%, var(--bg-deep) 100%);
-  background-attachment: fixed;
+  background-image: radial-gradient(120% 80% at 50% 0%, #161B24 0%, var(--bg-deep) 100%);
   color: var(--text);
   font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 button { font: inherit; color: inherit; }
@@ -79,15 +44,22 @@ button { font: inherit; color: inherit; }
 /* ---------- каркас ---------- */
 
 .app {
-  min-height: 100%;
-  user-select: none;
-  -webkit-user-select: none;
-  max-width: 1180px;
+  height: 100dvh;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 18px 20px 40px;
+  padding: calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right))
+           calc(8px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--gap);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* внутри Telegram шапку рисует сам мессенджер, а высоту окна он же и сообщает */
+.tg .app {
+  padding-top: 6px;
+  height: var(--tgh, 100dvh);
 }
 
 /* ---------- верхняя планка ---------- */
@@ -95,28 +67,26 @@ button { font: inherit; color: inherit; }
 .rail {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+  gap: 8px;
+  flex: none;
 }
 
 .mark {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   font-family: Forum, Georgia, serif;
-  font-size: 30px;
-  letter-spacing: .16em;
+  font-size: 20px;
+  letter-spacing: .14em;
   text-transform: uppercase;
   line-height: 1;
-  color: var(--text);
 }
 
 .mark em {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-style: normal;
-  font-size: 10px;
-  letter-spacing: .3em;
+  font-size: 9px;
+  letter-spacing: .28em;
   text-transform: uppercase;
   color: var(--brass);
 }
@@ -125,39 +95,27 @@ button { font: inherit; color: inherit; }
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 7px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
-.tally b {
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.tally span {
-  font-size: 10px;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-}
+.tally b { font-size: 16px; font-weight: 500; color: var(--text); }
 
 .chip {
-  padding: 3px 10px;
+  padding: 3px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 11px !important;
-  letter-spacing: .12em !important;
+  font-size: 10px;
+  letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--brass) !important;
+  color: var(--brass);
   white-space: nowrap;
 }
 
-.rail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-
-.btn .tight { display: none; }
+.rail-actions { display: flex; gap: 6px; }
 
 /* ---------- кнопки ---------- */
 
@@ -166,20 +124,26 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 999px;
-  padding: 8px 15px;
+  padding: 8px 14px;
   font-size: 13px;
-  letter-spacing: .02em;
   cursor: pointer;
-  transition: border-color .18s, background .18s, transform .18s, color .18s;
   white-space: nowrap;
+  transition: border-color .18s, background .18s, transform .12s, color .18s, opacity .18s;
 }
 
-.btn:hover:not(:disabled) { border-color: var(--brass); color: var(--brass-lit); }
-.btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: .38; cursor: default; }
+.btn:active:not(:disabled) { transform: scale(.96); }
+.btn:disabled { opacity: .32; }
 .btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
-.btn-icon { padding: 8px 11px; }
+.btn-icon {
+  width: 38px;
+  padding: 0;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+}
 
 .btn-key {
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
@@ -188,21 +152,35 @@ button { font: inherit; color: inherit; }
   font-weight: 500;
 }
 
-.btn-key:hover:not(:disabled) { color: #14100A; filter: brightness(1.08); }
+@media (hover: hover) {
+  .btn:hover:not(:disabled) { border-color: var(--brass); color: var(--brass-lit); }
+  .btn-key:hover:not(:disabled) { color: #14100A; filter: brightness(1.08); }
+}
 
-/* ---------- доска ---------- */
+/* ---------- стол ---------- */
 
-.table { position: relative; }
+.table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
 
-.stage { position: relative; }
+.stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .board {
   position: relative;
-  width: 100%;
-  aspect-ratio: 1240 / 820;
-  border-radius: 18px;
+  border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  touch-action: manipulation;
+  touch-action: none;
 }
 
 .board canvas {
@@ -210,55 +188,37 @@ button { font: inherit; color: inherit; }
   inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 18px;
+  border-radius: 16px;
   display: block;
 }
 
-.layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
+.layer { position: absolute; inset: 0; pointer-events: none; }
 .layer.hit { pointer-events: auto; }
 
-/* пункты — прозрачные зоны нажатия */
-.zone {
-  position: absolute;
-  cursor: default;
-  border-radius: 4px;
-}
+.zone { position: absolute; border-radius: 4px; }
 
-.zone.live {
-  cursor: pointer;
-  touch-action: none;
-}
+.zone.live { cursor: pointer; }
 
-/* доступный пункт слегка светится у основания */
 .zone.live::after {
   content: "";
   position: absolute;
-  left: 8%;
-  right: 8%;
-  height: 26%;
+  inset: 14%;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(200, 162, 74, .30), transparent 70%);
+  background: radial-gradient(circle, rgba(200, 162, 74, .34), transparent 70%);
   opacity: 0;
   transition: opacity .2s;
 }
 
-.zone.live[data-row="top"]::after { top: -4%; }
-.zone.live[data-row="bottom"]::after { bottom: -4%; }
-.zone.live:hover::after { opacity: 1; }
-
-.spot { touch-action: none; }
-
-.zone.tray::after { display: none; }
+@media (hover: hover) {
+  .zone.live:hover::after { opacity: 1; }
+}
 
 .zone.tray.live {
   box-shadow: inset 0 0 0 2px rgba(200, 162, 74, .45), inset 0 0 26px rgba(200, 162, 74, .25);
   border-radius: 9px;
 }
+
+.zone.tray::after { display: none; }
 
 /* ---------- шашки ---------- */
 
@@ -269,69 +229,34 @@ button { font: inherit; color: inherit; }
   width: var(--cd);
   height: var(--cd);
   border-radius: 50%;
+  background-size: 100% 100%;
   will-change: transform;
   transition: transform var(--move-dur) var(--ease), filter .2s ease;
   z-index: 1;
+  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .6));
 }
 
-.man::after {
+.man.pick { z-index: 6; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .7)) brightness(1.08); }
+
+.man.pick::before,
+.man.hint::before {
   content: "";
   position: absolute;
-  inset: 21%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, .28), rgba(0, 0, 0, .12) 70%);
-}
-
-.man.w {
-  background:
-    radial-gradient(circle at 34% 27%, #FFFAEE 0%, #EDDFC0 38%, #D3BE95 72%, #A78F63 100%);
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 253, 245, .55),
-    inset 0 -7px 14px rgba(122, 96, 55, .38),
-    0 7px 16px -4px rgba(0, 0, 0, .62);
-}
-
-.man.w::after { box-shadow: inset 0 0 0 1.5px rgba(140, 112, 66, .35); }
-
-.man.b {
-  background:
-    radial-gradient(circle at 34% 27%, #5A5045 0%, #3A312A 38%, #211B17 72%, #0D0A08 100%);
-  box-shadow:
-    inset 0 0 0 2px rgba(200, 162, 74, .30),
-    inset 0 -7px 14px rgba(0, 0, 0, .55),
-    0 6px 14px -4px rgba(0, 0, 0, .65);
-}
-
-.man.b::after { box-shadow: inset 0 0 0 1.5px rgba(200, 162, 74, .22); }
-
-.man.pick { filter: brightness(1.1); z-index: 6; }
-
-.man.pick::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
+  inset: -6%;
   border-radius: 50%;
   border: 2px solid var(--brass);
   box-shadow: 0 0 18px rgba(200, 162, 74, .55);
 }
 
-.man.hint::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 2px dashed var(--brass-lit);
-  animation: breathe 1.4s ease-in-out infinite;
-}
+.man.hint::before { border-style: dashed; animation: breathe 1.4s ease-in-out infinite; }
 
 .man.land { animation: land .34s var(--ease); }
 
 @keyframes land {
-  0%   { filter: brightness(1.4); }
-  100% { filter: brightness(1); }
+  0% { filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .6)) brightness(1.45); }
+  100% { filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .6)) brightness(1); }
 }
 
-/* счётчик на высокой стопке */
 .tag {
   position: absolute;
   left: 0;
@@ -340,20 +265,17 @@ button { font: inherit; color: inherit; }
   text-align: center;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: calc(var(--cd) * .34);
-  line-height: 1;
   font-weight: 500;
+  line-height: 1;
   color: #4B3517;
   text-shadow: 0 1px 2px rgba(255, 250, 235, .55);
   z-index: 20;
   pointer-events: none;
 }
 
-.tag.on-dark {
-  color: #F1E3BE;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
-}
+.tag.on-dark { color: #F1E3BE; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
 
-/* ---------- метки возможных ходов ---------- */
+/* ---------- метки хода ---------- */
 
 .spot {
   position: absolute;
@@ -363,12 +285,13 @@ button { font: inherit; color: inherit; }
   height: var(--cd);
   border-radius: 50%;
   border: 2px solid var(--brass);
-  background: radial-gradient(circle, rgba(200, 162, 74, .22), rgba(200, 162, 74, .04) 70%);
+  background: radial-gradient(circle, rgba(200, 162, 74, .24), rgba(200, 162, 74, .04) 70%);
   box-shadow: 0 0 22px rgba(200, 162, 74, .35);
   animation: breathe 1.6s ease-in-out infinite;
   z-index: 4;
   cursor: pointer;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .spot em {
@@ -401,36 +324,12 @@ button { font: inherit; color: inherit; }
 .die {
   position: absolute;
   inset: 0;
-  border-radius: calc(var(--dd) * .22);
-  background: linear-gradient(155deg, #FDF6E6 0%, #EADCBD 55%, #CBB68C 100%);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, .9),
-    inset 0 -4px 8px rgba(120, 96, 56, .35),
-    0 10px 20px -8px rgba(0, 0, 0, .7);
+  background-size: 100% 100%;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .65));
   transition: opacity .3s, transform .3s;
 }
 
-.die.dark {
-  background: linear-gradient(155deg, #4C4239 0%, #2B241E 55%, #14100D 100%);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, .16),
-    inset 0 -4px 8px rgba(0, 0, 0, .6),
-    0 10px 20px -8px rgba(0, 0, 0, .8);
-}
-
-.die i {
-  position: absolute;
-  width: 17%;
-  height: 17%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #6A5B45, #2A2119);
-  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, .5);
-}
-
-.die.dark i { background: radial-gradient(circle at 35% 30%, #E8D9B4, #B49A63); }
-
-.die.used { opacity: .45; transform: scale(.88); filter: saturate(.6); }
-
+.die.used { opacity: .4; transform: scale(.86); }
 .die.tumble { animation: tumble .58s var(--ease); }
 
 @keyframes tumble {
@@ -440,71 +339,56 @@ button { font: inherit; color: inherit; }
   100% { transform: translateY(0) rotate(0) scale(1); }
 }
 
-/* ---------- сообщение над доской ---------- */
+/* ---------- реплики и сообщения ---------- */
 
-.quip {
+.quip, .toast {
   position: absolute;
   left: 50%;
-  top: 4%;
   transform: translate(-50%, 8px);
-  max-width: min(88%, 34rem);
-  padding: 10px 22px;
-  border-radius: 999px;
-  background: rgba(12, 9, 6, .8);
-  border: 1px solid rgba(200, 162, 74, .34);
-  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
-  font-family: Forum, Georgia, serif;
-  font-size: clamp(15px, 2.2vw, 21px);
-  letter-spacing: .02em;
-  color: #F2E4C2;
-  text-align: center;
-  text-wrap: balance;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .28s, transform .28s var(--ease);
-  z-index: 21;
-}
-
-.quip.show { opacity: 1; transform: translate(-50%, 0); }
-
-.toast {
-  position: absolute;
-  left: 50%;
-  bottom: 6%;
-  transform: translate(-50%, 10px);
-  padding: 9px 18px;
-  border-radius: 999px;
-  background: rgba(10, 8, 6, .84);
-  border: 1px solid rgba(200, 162, 74, .38);
-  color: #F0E6D2;
-  font-size: 13px;
-  letter-spacing: .02em;
   max-width: min(92%, 30rem);
   text-align: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .25s, transform .25s;
-  z-index: 20;
+  z-index: 21;
+  transition: opacity .28s, transform .28s var(--ease);
+}
+
+.quip {
+  top: 2%;
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: rgba(12, 9, 6, .84);
+  border: 1px solid rgba(200, 162, 74, .34);
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
+  font-family: Forum, Georgia, serif;
+  font-size: clamp(15px, 4vw, 20px);
+  color: #F2E4C2;
+  text-wrap: balance;
+  backdrop-filter: blur(4px);
+}
+
+.toast {
+  bottom: 3%;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(10, 8, 6, .86);
+  border: 1px solid rgba(200, 162, 74, .3);
+  color: #F0E6D2;
+  font-size: 13px;
   backdrop-filter: blur(6px);
 }
 
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.quip.show, .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* ---------- нижние панели ---------- */
-
-.panels {
-  display: grid;
-  grid-template-columns: 1fr 1.1fr 1fr;
-  gap: 14px;
-  align-items: start;
-}
+/* ---------- таблички игроков ---------- */
 
 .plaque {
   position: relative;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 15px;
+  gap: 10px;
+  padding: 9px 13px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -528,20 +412,14 @@ button { font: inherit; color: inherit; }
 .plaque.act { border-color: color-mix(in srgb, var(--brass) 55%, transparent); background: var(--panel-2); }
 .plaque.act::before { transform: scaleX(1); }
 
-.disc {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  flex: none;
-}
+.disc { width: 26px; height: 26px; border-radius: 50%; flex: none; background-size: 100% 100%; }
 
-.disc.w { background: radial-gradient(circle at 34% 28%, #FFFAEE, #E0D0AE 60%, #AC9469); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .5), 0 2px 6px rgba(0, 0, 0, .35); }
-.disc.b { background: radial-gradient(circle at 34% 28%, #574D42, #241E19 60%, #100C09); box-shadow: inset 0 0 0 1.5px rgba(200, 162, 74, .3), 0 2px 6px rgba(0, 0, 0, .45); }
+.pwho { min-width: 0; }
 
 .pname {
   font-family: Forum, Georgia, serif;
-  font-size: 19px;
-  letter-spacing: .08em;
+  font-size: 17px;
+  letter-spacing: .07em;
   text-transform: uppercase;
   line-height: 1.15;
 }
@@ -549,49 +427,46 @@ button { font: inherit; color: inherit; }
 .pmeta {
   font-size: 11px;
   color: var(--text-dim);
-  letter-spacing: .04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.pstats {
-  margin-left: auto;
-  display: flex;
-  gap: 14px;
-  text-align: right;
-}
-
+.pstats { margin-left: auto; display: flex; gap: 13px; text-align: right; }
 .pstats div { display: flex; flex-direction: column; }
 
 .pstats b {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 500;
   line-height: 1.1;
 }
 
 .pstats span {
-  font-size: 9px;
-  letter-spacing: .18em;
+  font-size: 8px;
+  letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
 
-/* журнал ходов */
+/* ---------- журнал ---------- */
 
 .log {
+  flex: none;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
-  padding: 10px 4px 10px 14px;
-  min-height: 84px;
+  padding: 9px 4px 9px 13px;
+  display: none;
 }
 
 .log h2 {
-  margin: 0 0 6px;
+  margin: 0 0 5px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 9px;
   font-weight: 500;
-  letter-spacing: .26em;
+  letter-spacing: .24em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
@@ -600,10 +475,8 @@ button { font: inherit; color: inherit; }
   margin: 0;
   padding: 0 10px 0 0;
   list-style: none;
-  max-height: 102px;
+  max-height: 84px;
   overflow-y: auto;
-  mask-image: linear-gradient(to top, transparent, #000 20px);
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
   display: flex;
   flex-direction: column-reverse;
   gap: 3px;
@@ -611,42 +484,49 @@ button { font: inherit; color: inherit; }
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
 }
 
 .log li { display: flex; gap: 8px; }
 .log li b { font-weight: 500; color: var(--text); min-width: 52px; }
-.log li.w b { color: var(--text); }
 .log li.b b { color: var(--brass); }
 
-/* ---------- модальное окно ---------- */
+/* журнал показываем там, где для него есть место */
+@media (min-height: 780px) and (min-width: 620px) {
+  .log { display: block; }
+}
+
+/* ---------- диалоги ---------- */
 
 .veil {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 24px;
-  background: color-mix(in srgb, var(--bg-deep) 78%, transparent);
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  background: rgba(6, 8, 13, .76);
   backdrop-filter: blur(10px) saturate(.9);
   z-index: 60;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .35s;
+  transition: opacity .3s;
 }
 
 .veil.show { opacity: 1; pointer-events: auto; }
 
 .sheet {
-  width: min(480px, 100%);
-  max-height: 88vh;
+  width: min(460px, 100%);
+  max-height: 100%;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--panel);
   box-shadow: var(--shadow-lg);
-  padding: 26px 28px 24px;
+  padding: 22px 20px 20px;
   transform: translateY(12px) scale(.98);
-  transition: transform .35s var(--ease);
+  transition: transform .3s var(--ease);
 }
 
 .veil.show .sheet { transform: none; }
@@ -654,28 +534,23 @@ button { font: inherit; color: inherit; }
 .sheet h1 {
   margin: 0 0 4px;
   font-family: Forum, Georgia, serif;
-  font-size: 34px;
+  font-size: 27px;
   font-weight: 400;
-  letter-spacing: .12em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   text-wrap: balance;
 }
 
-.sheet .lede {
-  margin: 0 0 22px;
-  color: var(--text-dim);
-  font-size: 13px;
-  max-width: 46ch;
-}
+.sheet .lede { margin: 0 0 18px; color: var(--text-dim); font-size: 13px; }
 
-.field { margin-bottom: 18px; }
+.field { margin-bottom: 16px; }
 
 .field > label {
   display: block;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 9px;
-  letter-spacing: .26em;
+  letter-spacing: .24em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
@@ -696,32 +571,30 @@ button { font: inherit; color: inherit; }
   border: 0;
   background: transparent;
   border-radius: 999px;
-  padding: 8px 6px;
+  padding: 9px 4px;
   font-size: 13px;
   cursor: pointer;
   color: var(--text-dim);
   transition: background .2s, color .2s;
 }
 
-.seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] {
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
   color: #14100A;
 }
+
 .seg button:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
 
-.hint {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--text-dim);
-  min-height: 1em;
-}
+.sheet-actions { display: flex; gap: 8px; margin-top: 20px; }
+.sheet-actions .btn { flex: 1; text-align: center; padding: 12px 10px; }
 
-.field.gap { margin-top: 24px; }
+.hint { margin: 7px 0 0; font-size: 12px; color: var(--text-dim); min-height: 1em; }
+
+.field.gap { margin-top: 20px; }
 
 .inp {
   width: 100%;
-  padding: 10px 14px;
+  padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel-2);
@@ -746,10 +619,10 @@ button { font: inherit; color: inherit; }
 .code-big {
   margin: 4px 0 2px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 40px;
-  letter-spacing: .28em;
+  font-size: 34px;
+  letter-spacing: .24em;
   text-align: center;
-  text-indent: .28em;
+  text-indent: .24em;
   color: var(--brass-lit);
 }
 
@@ -775,94 +648,61 @@ button { font: inherit; color: inherit; }
   font-size: 13px;
 }
 
-.tables li.muted {
-  color: var(--text-dim);
-  border-style: dashed;
-  background: transparent;
-}
-
-.tables b {
-  font-weight: 500;
-  letter-spacing: .16em;
-  color: var(--brass-lit);
-}
-
+.tables li.muted { color: var(--text-dim); border-style: dashed; background: transparent; }
+.tables b { font-weight: 500; letter-spacing: .16em; color: var(--brass-lit); }
 .tables span { color: var(--text-dim); margin-right: auto; }
 .tables .btn { padding: 6px 13px; font-size: 12px; }
 
 .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 
-.sheet-actions { display: flex; gap: 10px; margin-top: 22px; }
-.sheet-actions .btn { flex: 1; text-align: center; padding: 11px 16px; }
-
 .rules { font-size: 13.5px; color: var(--text-dim); }
+
 .rules h3 {
-  margin: 18px 0 5px;
+  margin: 16px 0 4px;
   font-family: Forum, Georgia, serif;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 400;
-  letter-spacing: .08em;
+  letter-spacing: .07em;
   text-transform: uppercase;
   color: var(--text);
 }
-.rules p { margin: 0 0 8px; max-width: 62ch; }
+
+.rules p { margin: 0 0 7px; }
 .rules b { color: var(--text); font-weight: 500; }
 
 .crown {
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
-  margin: 0 auto 14px;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 12px;
   border-radius: 50%;
   border: 1px solid var(--line);
 }
 
-.crown .disc { width: 40px; height: 40px; }
+.crown .disc { width: 38px; height: 38px; }
 
-/* ---------- адаптив ---------- */
+/* ---------- совсем узкие экраны ---------- */
 
-@media (max-width: 860px) {
-  .app { padding: 12px 12px 28px; gap: 12px; }
-  .mark { font-size: 22px; }
-  .mark em { display: none; }
-  .panels { grid-template-columns: 1fr; }
-  .log { order: 3; }
-  .rail { flex-wrap: wrap; gap: 10px; }
-  .tally { order: 3; margin-left: 0; }
-  .rail-actions { margin-left: auto; }
-  .btn { padding: 7px 12px; font-size: 12px; }
-}
-
+/* на телефоне название не нужно — его показывает сам Telegram */
 @media (max-width: 560px) {
-  .btn .wide { display: none; }
-  .btn .tight { display: inline; }
-  .btn { padding: 7px 11px; }
-  .sheet { padding: 20px 18px; }
-  .sheet h1 { font-size: 27px; }
+  .mark { display: none; }
+  .tally { margin-left: 0; margin-right: auto; }
+  .app { padding-left: calc(6px + env(safe-area-inset-left)); padding-right: calc(6px + env(safe-area-inset-right)); }
 }
 
-/* Телефон в портрете: доска разворачивается на 90°, шашки становятся
-   в полтора раза крупнее — иначе играть пальцем невозможно. */
-@media (max-width: 700px) and (orientation: portrait) {
-  .stage {
-    width: 100%;
-    aspect-ratio: 820 / 1240;
-    overflow: hidden;
-  }
-  .stage .board {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 151.22%;
-    transform: translate(-50%, -50%) rotate(90deg);
-  }
-  .log ol { max-height: 58px; }
-  .panels { gap: 8px; }
-  .plaque { padding: 10px 12px; }
+@media (max-width: 380px) {
+  .btn { padding: 8px 11px; font-size: 12px; }
+  .btn-icon { width: 34px; height: 34px; }
+  .pstats { gap: 10px; }
+}
+
+@media (max-height: 620px) {
+  .plaque { padding: 6px 11px; }
+  .pname { font-size: 15px; }
+  .pmeta { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
-  .man { transition-duration: .01ms; }
+  *, .man { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
