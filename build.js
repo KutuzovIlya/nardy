@@ -12,6 +12,9 @@ let html = read('index.html');
 /* заглушка хранилища нужна только для локальной отладки */
 html = html.replace(/\s*<script src="js\/mock-db\.js[^"]*"><\/script>/, '');
 
+/* внутрь артефакта внешние скрипты не пускает политика безопасности */
+html = html.replace(/\s*<script src="https:\/\/telegram\.org[^"]*"><\/script>/, '');
+
 html = html.replace(
   /<link rel="stylesheet" href="css\/style\.css[^"]*">/,
   '<style>\n' + read('css/style.css').trim() + '\n</style>'
