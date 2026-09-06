@@ -1128,10 +1128,12 @@
       '<div class="code-big mono">' + esc(net.code) + '</div>' +
       '<p class="hint" style="text-align:center">' +
       (waiting ? 'Ждём соперника…' : 'Вы играете ' + (net.seat === 'w' ? 'белыми' : 'чёрными')) + '</p>' +
-      '<div class="field"><label>Ссылка-приглашение</label><div class="row">' +
-      '<input class="inp" id="net-link" readonly value="' + esc(shareLink()) + '">' +
-      '<button class="btn" type="button" data-act="net-copy">Копировать</button></div>' +
-      '<p class="hint">По ней соперник попадёт прямо за этот стол.</p></div>' +
+      /* внутри артефакта страница живёт в песочнице — её адрес сопернику не отдать */
+      (NardyNet.kind() === 'db' ? '' :
+        '<div class="field"><label>Ссылка-приглашение</label><div class="row">' +
+        '<input class="inp" id="net-link" readonly value="' + esc(shareLink()) + '">' +
+        '<button class="btn" type="button" data-act="net-copy">Копировать</button></div>' +
+        '<p class="hint">По ней соперник попадёт прямо за этот стол.</p></div>') +
       '<div class="field"><label>Комментатор</label>' +
       segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
       '</div>' +
