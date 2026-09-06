@@ -1259,6 +1259,8 @@
   }
 
   function newGame() {
+    /* «по сети» без стола — это не партия, а недоразумение */
+    if (opts.mode === 'net' && !net.code) { netSheet(); return; }
     closeSheet();
     hushQuip();
     bf = {}; NardyBanter.reset();
