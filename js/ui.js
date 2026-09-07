@@ -260,12 +260,7 @@
     $('pl-w').style.order = my === 'b' ? '0' : '2';
     $('pl-b').style.order = my === 'b' ? '2' : '0';
     stage.style.order = '1';
-    if (B.isFlip() !== (my === 'w')) {
-      B.setFlip(my === 'w');
-      buildZones();
-      B.render(scene);
-      if (VIS) place(true);
-    }
+    /* доску не разворачиваем: расстановка голов фиксированная */
   }
 
   function scale() { return board.clientWidth / B.vw(); }

@@ -52,9 +52,13 @@
 
   function colX(j) { return FRAME + j * COL + (j >= 6 ? BAR : 0); }
 
+  /* Голова белых — верхний правый угол, чёрных — нижний левый.
+     Отсюда и раскладка: сверху пункты 11..0 слева направо,
+     снизу 12..23. Дом белых оказывается в нижнем правом углу,
+     дом чёрных — в верхнем левом. */
   function geom(i) {
-    var top = i >= 12;
-    var j = top ? i - 12 : 11 - i;
+    var top = i < 12;
+    var j = top ? 11 - i : i - 12;
     return { j: j, top: top, x: colX(j), y: top ? TOPY : BOTY - PTH, w: COL, h: PTH };
   }
 
@@ -72,9 +76,9 @@
     };
   }
 
-  /* Снятые шашки ложатся в полку: белые сверху, чёрные снизу */
+  /* Снятые ложатся в полку у своего дома: белые снизу, чёрные сверху */
   function trayAt(player, k) {
-    var step = 50, y0 = player === 'w' ? FRAME : VH - FRAME - SHELF;
+    var step = 50, y0 = player === 'w' ? VH - FRAME - SHELF : FRAME;
     return {
       x: player === 'w'
         ? VW - FRAME - 10 - CD - k * step
@@ -86,7 +90,7 @@
   function trayBox(player) {
     return {
       x: FRAME + 4,
-      y: player === 'w' ? FRAME + 3 : VH - FRAME - SHELF + 3,
+      y: player === 'w' ? VH - FRAME - SHELF + 3 : FRAME + 3,
       w: VW - 2 * FRAME - 8,
       h: SHELF - 6
     };
@@ -425,8 +429,8 @@
     ctx.strokeStyle = 'rgba(200,162,74,.45)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(colX(6), TOPY - 3); ctx.lineTo(colX(11) + COL, TOPY - 3);
-    ctx.moveTo(colX(0), BOTY + 3); ctx.lineTo(colX(5) + COL, BOTY + 3);
+    ctx.moveTo(colX(0), TOPY - 3); ctx.lineTo(colX(5) + COL, TOPY - 3);
+    ctx.moveTo(colX(6), BOTY + 3); ctx.lineTo(colX(11) + COL, BOTY + 3);
     ctx.stroke();
   }
 
