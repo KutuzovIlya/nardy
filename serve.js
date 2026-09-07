@@ -17,6 +17,8 @@ const TYPES = {
 
 http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
+
+
   let file = path.join(ROOT, url === '/' ? 'index.html' : url);
   if (!file.startsWith(ROOT)) { res.writeHead(403).end(); return; }
   fs.readFile(file, (err, data) => {
