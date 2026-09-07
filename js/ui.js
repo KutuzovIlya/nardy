@@ -238,24 +238,34 @@
     return v;
   }
 
-  /* Доска занимает всё, что осталось от экрана; на телефоне встаёт вертикально */
+  /* Доска лежит горизонтально и занимает всю ширину экрана.
+     Таблички игроков прижимаются к ней вплотную, а свободная высота
+     уходит наружу — иначе вокруг доски зияют пустые поля. */
   function fit() {
-    var tall = window.innerWidth < window.innerHeight * 0.95;
-    if (tall !== B.isTall()) { B.setTall(tall); buildZones(); }
-    var w = stage.clientWidth, h = stage.clientHeight;
-    if (!w || !h) return;
+    var tbl = document.querySelector('.table');
+    var w = tbl.clientWidth;
+    var h = tbl.clientHeight - $('pl-w').offsetHeight - $('pl-b').offsetHeight - 20;
+    if (!w || h < 120) return;
     var ar = B.vw() / B.vh();
     if (w / h > ar) w = h * ar; else h = w / ar;
     board.style.width = Math.floor(w) + 'px';
     board.style.height = Math.floor(h) + 'px';
+    stage.style.flex = 'none';
+    stage.style.height = Math.floor(h) + 'px';
   }
 
-  /* Свой цвет всегда снизу — как за настоящим столом */
+  /* Свой цвет снизу, свой дом — в ближнем углу: как за настоящим столом */
   function setSides() {
     var my = isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : 'w');
     $('pl-w').style.order = my === 'b' ? '0' : '2';
     $('pl-b').style.order = my === 'b' ? '2' : '0';
     stage.style.order = '1';
+    if (B.isFlip() !== (my === 'w')) {
+      B.setFlip(my === 'w');
+      buildZones();
+      B.render(scene);
+      if (VIS) place(true);
+    }
   }
 
   function scale() { return board.clientWidth / B.vw(); }

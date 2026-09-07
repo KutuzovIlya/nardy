@@ -171,6 +171,7 @@ button { font: inherit; color: inherit; }
   min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--gap);
 }
 
@@ -499,8 +500,8 @@ button { font: inherit; color: inherit; }
 .log li b { font-weight: 500; color: var(--text); min-width: 52px; }
 .log li.b b { color: var(--brass); }
 
-/* журнал показываем там, где для него есть место */
-@media (min-height: 780px) and (min-width: 620px) {
+/* журнал показываем там, где под доской осталось место */
+@media (min-height: 700px) {
   .log { display: block; }
 }
 
@@ -754,9 +755,9 @@ button { font: inherit; color: inherit; }
         <div class="layer" id="men"></div>
         <div class="layer" id="spots"></div>
         <div class="layer" id="dice"></div>
+        <div class="quip" id="quip"></div>
+        <div class="toast" id="toast"></div>
       </div>
-      <div class="quip" id="quip"></div>
-      <div class="toast" id="toast"></div>
     </div>
 
     <div class="plaque" id="pl-w">
@@ -1199,16 +1200,26 @@ button { font: inherit; color: inherit; }
 (function (global) {
   'use strict';
 
-  var VW = 1240, VH = 820;
-  var FRAME = 26, TRAY = 96, GAP = 12;
-  var FX0 = FRAME + TRAY + GAP;
-  var FX1 = VW - FRAME - TRAY - GAP;
-  var BAR = 48;
-  var PTW = (FX1 - FX0 - BAR) / 12;
-  var FY0 = FRAME + 10, FY1 = VH - FRAME - 10;
-  var PTH = 316, CD = 66, DD = 62;
+  /* Доска лежит горизонтально, телефон — вертикально в руке.
+     Ширину делят 12 пунктов и планка, поэтому она и задаёт размер
+     шашки: всё лишнее из ширины убрано, лотки для снятых шашек
+     переехали в полки на верхнем и нижнем борту. */
+  var CD = 66;          /* шашка — единица меры */
+  var COL = 68;         /* пункт чуть шире шашки */
+  var BAR = 36;         /* средняя планка */
+  var FRAME = 14;       /* борт */
+  var SHELF = 72;       /* полка для снятых шашек */
+  var PTH = 380;        /* длина пункта: 15 шашек влезают, не вылезая в середину */
+  var MID = 126;        /* поле между рядами, там же кости */
+  var DD = 88;          /* кость: четыре при дубле должны влезать в половину доски */
 
-  var tall = false;   /* вертикальная раскладка */
+  var VW = 2 * FRAME + 12 * COL + BAR;                    /* 880 */
+  var VH = 2 * FRAME + 2 * SHELF + 2 * PTH + MID;         /* 810 — доска шире, чем выше */
+
+  var TOPY = FRAME + SHELF;              /* верх верхнего ряда */
+  var BOTY = VH - FRAME - SHELF;         /* низ нижнего ряда */
+
+  var flip = false;     /* развернуть доску на 180°, чтобы свой дом был снизу */
 
   var C = {
     frameHi: '#5E3A23', frameLo: '#1E110B',
@@ -1218,58 +1229,67 @@ button { font: inherit; color: inherit; }
     brass: '#C8A24A', dark: '#2B1710'
   };
 
-  function setTall(v) { tall = !!v; }
-  function isTall() { return tall; }
-  function vw() { return tall ? VH : VW; }
-  function vh() { return tall ? VW : VH; }
+  function setFlip(v) { flip = !!v; }
+  function isFlip() { return flip; }
+  function vw() { return VW; }
+  function vh() { return VH; }
 
-  /* Прямоугольник из альбомных координат в текущие */
+  /* Разворот доски на 180°: тот же стол, только вы сидите с другой стороны */
   function map(x, y, w, h) {
-    if (!tall) return { x: x, y: y, w: w, h: h };
-    return { x: VH - y - h, y: x, w: h, h: w };
+    if (!flip) return { x: x, y: y, w: w, h: h };
+    return { x: VW - x - w, y: VH - y - h, w: w, h: h };
   }
 
-  function colX(j) { return FX0 + j * PTW + (j >= 6 ? BAR : 0); }
+  function colX(j) { return FRAME + j * COL + (j >= 6 ? BAR : 0); }
 
   function geom(i) {
     var top = i >= 12;
     var j = top ? i - 12 : 11 - i;
-    return { j: j, top: top, x: colX(j), y: top ? FY0 : FY1 - PTH, w: PTW, h: PTH };
+    return { j: j, top: top, x: colX(j), y: top ? TOPY : BOTY - PTH, w: COL, h: PTH };
   }
 
+  /* Стопка выше пяти вылезает за пункт в середину — как на настоящей доске */
   function gapFor(n) {
     if (n <= 1) return 0;
-    return Math.max(15, Math.min(58, (PTH - CD) / (n - 1)));
+    return Math.max(18, Math.min(56, (PTH - CD) / (n - 1)));
   }
 
   function manAt(i, k, n) {
     var g = geom(i), sp = gapFor(n);
     return {
-      x: g.x + (PTW - CD) / 2,
-      y: g.top ? FY0 + k * sp : FY1 - CD - k * sp
+      x: g.x + (COL - CD) / 2,
+      y: g.top ? TOPY + k * sp : BOTY - CD - k * sp
     };
   }
 
+  /* Снятые шашки ложатся в полку: белые сверху, чёрные снизу */
   function trayAt(player, k) {
+    var step = 50, y0 = player === 'w' ? FRAME : VH - FRAME - SHELF;
     return {
-      x: player === 'w' ? VW - FRAME - TRAY + (TRAY - CD) / 2 : FRAME + (TRAY - CD) / 2,
-      y: player === 'w' ? FY0 + k * 30 : FY1 - CD - k * 30
+      x: player === 'w'
+        ? VW - FRAME - 10 - CD - k * step
+        : FRAME + 10 + k * step,
+      y: y0 + (SHELF - CD) / 2
     };
   }
 
   function trayBox(player) {
     return {
-      x: player === 'w' ? VW - FRAME - TRAY + 3 : FRAME + 3,
-      y: FRAME + 8,
-      w: TRAY - 6,
-      h: VH - 2 * FRAME - 16
+      x: FRAME + 4,
+      y: player === 'w' ? FRAME + 3 : VH - FRAME - SHELF + 3,
+      w: VW - 2 * FRAME - 8,
+      h: SHELF - 6
     };
   }
 
   function diceAt(player, idx, n) {
-    var cx = player === 'w' ? FX0 + 9 * PTW + BAR : FX0 + 3 * PTW;
-    var total = n * DD + (n - 1) * 10;
-    return { x: cx - total / 2 + idx * (DD + 10), y: (FY0 + PTH + FY1 - PTH) / 2 - DD / 2 };
+    /* по центру своей половины, а не поверх конкретного пункта —
+       иначе четыре кости при дубле упираются в борт */
+    var cx = player === 'w'
+      ? (colX(6) + colX(11) + COL) / 2
+      : (colX(0) + colX(5) + COL) / 2;
+    var gap = 8, total = n * DD + (n - 1) * gap;
+    return { x: cx - total / 2 + idx * (DD + gap), y: TOPY + PTH + (MID - DD) / 2 };
   }
 
   /* ---------- вспомогательное ---------- */
@@ -1405,7 +1425,7 @@ button { font: inherit; color: inherit; }
     g.addColorStop(0, C.frameHi);
     g.addColorStop(0.45, '#3B2114');
     g.addColorStop(1, C.frameLo);
-    rrect(ctx, 0, 0, VW, VH, 20);
+    rrect(ctx, 0, 0, VW, VH, 16);
     ctx.fillStyle = g;
     ctx.fill();
     grain(ctx, 0, 0, VW, VH, 7, 210, 0.12);
@@ -1413,22 +1433,22 @@ button { font: inherit; color: inherit; }
     var c = FRAME / 2;
     ctx.save();
     ctx.beginPath();
-    rrect(ctx, 0, 0, VW, VH, 20);
-    rrect(ctx, FRAME, FRAME, VW - 2 * FRAME, VH - 2 * FRAME, 6);
+    rrect(ctx, 0, 0, VW, VH, 16);
+    rrect(ctx, FRAME, FRAME, VW - 2 * FRAME, VH - 2 * FRAME, 5);
     ctx.clip('evenodd');
-    chevrons(ctx, 60, c, VW - 60, c, 15);
-    chevrons(ctx, VW - 60, VH - c, 60, VH - c, 15);
-    chevrons(ctx, c, VH - 60, c, 60, 15);
-    chevrons(ctx, VW - c, 60, VW - c, VH - 60, 15);
+    chevrons(ctx, 34, c, VW - 34, c, 10);
+    chevrons(ctx, VW - 34, VH - c, 34, VH - c, 10);
+    chevrons(ctx, c, VH - 34, c, 34, 10);
+    chevrons(ctx, VW - c, 34, VW - c, VH - 34, 10);
     ctx.restore();
 
-    [[c + 2, c + 2], [VW - c - 2, c + 2], [c + 2, VH - c - 2], [VW - c - 2, VH - c - 2]]
-      .forEach(function (p) { rosette(ctx, p[0], p[1], 15, 8); });
+    [[c + 1, c + 1], [VW - c - 1, c + 1], [c + 1, VH - c - 1], [VW - c - 1, VH - c - 1]]
+      .forEach(function (p) { rosette(ctx, p[0], p[1], 9, 8); });
 
     ctx.strokeStyle = 'rgba(200,162,74,.42)';
     ctx.lineWidth = 1.1;
-    rrect(ctx, 3.5, 3.5, VW - 7, VH - 7, 17); ctx.stroke();
-    rrect(ctx, FRAME - 2.5, FRAME - 2.5, VW - 2 * FRAME + 5, VH - 2 * FRAME + 5, 7); ctx.stroke();
+    rrect(ctx, 2.5, 2.5, VW - 5, VH - 5, 14); ctx.stroke();
+    rrect(ctx, FRAME - 2, FRAME - 2, VW - 2 * FRAME + 4, VH - 2 * FRAME + 4, 6); ctx.stroke();
   }
 
   function drawBed(ctx) {
@@ -1439,67 +1459,65 @@ button { font: inherit; color: inherit; }
     g.addColorStop(1, C.bedLo);
     ctx.fillStyle = g;
     ctx.fillRect(x, y, w, h);
-    grain(ctx, x, y, w, h, 21, 170, 0.10);
+    grain(ctx, x, y, w, h, 21, 190, 0.10);
 
-    var s = ctx.createLinearGradient(x, 0, x + 44, 0);
+    var s = ctx.createLinearGradient(x, 0, x + 34, 0);
     s.addColorStop(0, 'rgba(0,0,0,.6)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(x, y, 44, h);
-    s = ctx.createLinearGradient(x + w, 0, x + w - 44, 0);
+    ctx.fillStyle = s; ctx.fillRect(x, y, 34, h);
+    s = ctx.createLinearGradient(x + w, 0, x + w - 34, 0);
     s.addColorStop(0, 'rgba(0,0,0,.6)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(x + w - 44, y, 44, h);
-    s = ctx.createLinearGradient(0, y, 0, y + 32);
-    s.addColorStop(0, 'rgba(0,0,0,.55)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(x, y, w, 32);
+    ctx.fillStyle = s; ctx.fillRect(x + w - 34, y, 34, h);
   }
 
-  function drawTray(ctx, side) {
-    var b = trayBox(side === 'l' ? 'b' : 'w');
-    rrect(ctx, b.x, b.y, b.w, b.h, 10);
+  /* Полка для снятых шашек — утопленный жёлоб вдоль борта */
+  function drawShelf(ctx, player) {
+    var b = trayBox(player);
+    rrect(ctx, b.x, b.y, b.w, b.h, 8);
     ctx.fillStyle = '#190D06';
     ctx.fill();
     ctx.save();
     ctx.clip();
-    grain(ctx, b.x, b.y, b.w, b.h, side === 'l' ? 33 : 44, 44, 0.08);
-    var s = ctx.createLinearGradient(b.x, b.y, b.x + 24, b.y);
+    grain(ctx, b.x, b.y, b.w, b.h, player === 'w' ? 33 : 44, 40, 0.08);
+    var s = ctx.createLinearGradient(0, b.y, 0, b.y + 18);
     s.addColorStop(0, 'rgba(0,0,0,.8)'); s.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = s; ctx.fillRect(b.x, b.y, 24, b.h);
+    ctx.fillStyle = s; ctx.fillRect(b.x, b.y, b.w, 18);
     ctx.restore();
-    ctx.strokeStyle = 'rgba(200,162,74,.3)';
+    ctx.strokeStyle = 'rgba(200,162,74,.28)';
     ctx.lineWidth = 1;
-    rrect(ctx, b.x, b.y, b.w, b.h, 10); ctx.stroke();
-    label(ctx, b.x + b.w / 2, side === 'l' ? b.y + 34 : b.y + b.h - 34, 'ДОМ');
+    rrect(ctx, b.x, b.y, b.w, b.h, 8); ctx.stroke();
+    label(ctx, player === 'w' ? b.x + 40 : b.x + b.w - 40, b.y + b.h / 2, 'ДОМ');
   }
 
-  /* Надпись всегда стоит ровно, как бы ни лежала доска */
+  /* Надпись стоит ровно, даже если доска развёрнута на 180° */
   function label(ctx, x, y, text) {
     ctx.save();
     ctx.translate(x, y);
-    if (tall) ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = 'rgba(214,178,104,.5)';
-    ctx.font = '500 15px "IBM Plex Mono", monospace';
+    if (flip) ctx.rotate(Math.PI);
+    ctx.fillStyle = 'rgba(214,178,104,.42)';
+    ctx.font = '500 13px "IBM Plex Mono", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '5px';
+    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '4px';
     ctx.fillText(text, 0, 0);
     ctx.restore();
   }
 
   function drawBar(ctx) {
-    var x = FX0 + 6 * PTW, y = FRAME + 8, h = VH - 2 * FRAME - 16;
+    var x = colX(6) - BAR, y = TOPY - 6, h = BOTY - TOPY + 12;
     var g = ctx.createLinearGradient(x, 0, x + BAR, 0);
     g.addColorStop(0, '#150B05');
     g.addColorStop(0.5, '#4E2D1B');
     g.addColorStop(1, '#150B05');
-    rrect(ctx, x, y, BAR, h, 8);
+    rrect(ctx, x, y, BAR, h, 6);
     ctx.fillStyle = g; ctx.fill();
     ctx.save();
     ctx.clip();
     grain(ctx, x, y, BAR, h, 55, 30, 0.12);
-    chevrons(ctx, x + BAR / 2, y + 30, x + BAR / 2, y + h - 30, 13);
+    chevrons(ctx, x + BAR / 2, y + 22, x + BAR / 2, y + h - 22, 10);
     ctx.restore();
-    ctx.strokeStyle = 'rgba(200,162,74,.28)';
+    ctx.strokeStyle = 'rgba(200,162,74,.26)';
     ctx.lineWidth = 1;
-    rrect(ctx, x, y, BAR, h, 8); ctx.stroke();
+    rrect(ctx, x, y, BAR, h, 6); ctx.stroke();
   }
 
   function drawPoints(ctx) {
@@ -1507,12 +1525,12 @@ button { font: inherit; color: inherit; }
     for (i = 0; i < 24; i++) {
       g = geom(i);
       light = ((g.j + (g.top ? 0 : 1)) % 2) === 0;
-      baseY = g.top ? FY0 : FY1;
-      apexY = g.top ? FY0 + PTH : FY1 - PTH;
+      baseY = g.top ? TOPY : BOTY;
+      apexY = g.top ? TOPY + PTH : BOTY - PTH;
       ctx.beginPath();
-      ctx.moveTo(g.x + 1.5, baseY);
-      ctx.lineTo(g.x + PTW - 1.5, baseY);
-      ctx.lineTo(g.x + PTW / 2, apexY);
+      ctx.moveTo(g.x + 1, baseY);
+      ctx.lineTo(g.x + COL - 1, baseY);
+      ctx.lineTo(g.x + COL / 2, apexY);
       ctx.closePath();
       grd = ctx.createLinearGradient(0, baseY, 0, apexY);
       if (light) {
@@ -1524,21 +1542,22 @@ button { font: inherit; color: inherit; }
       ctx.fill();
       ctx.save();
       ctx.clip();
-      grain(ctx, g.x, Math.min(baseY, apexY), PTW, PTH, 100 + i, 14, light ? 0.07 : 0.05);
+      grain(ctx, g.x, Math.min(baseY, apexY), COL, PTH, 100 + i, 12, light ? 0.07 : 0.05);
       ctx.restore();
       ctx.strokeStyle = light ? 'rgba(70,45,18,.45)' : 'rgba(0,0,0,.45)';
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
-    /* резные солнца в свободных полях между рядами */
-    rosette(ctx, FX0 + 3 * PTW, VH / 2, 40, 12);
-    rosette(ctx, FX0 + 9 * PTW + BAR, VH / 2, 40, 12);
+    /* резные солнца в поле между рядами */
+    rosette(ctx, colX(3) + COL / 2, TOPY + PTH + MID / 2, 34, 12);
+    rosette(ctx, colX(9) + COL / 2, TOPY + PTH + MID / 2, 34, 12);
 
+    /* латунная нить вдоль домов */
     ctx.strokeStyle = 'rgba(200,162,74,.45)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(colX(6), FY0 - 3); ctx.lineTo(colX(11) + PTW, FY0 - 3);
-    ctx.moveTo(colX(0), FY1 + 3); ctx.lineTo(colX(5) + PTW, FY1 + 3);
+    ctx.moveTo(colX(6), TOPY - 3); ctx.lineTo(colX(11) + COL, TOPY - 3);
+    ctx.moveTo(colX(0), BOTY + 3); ctx.lineTo(colX(5) + COL, BOTY + 3);
     ctx.stroke();
   }
 
@@ -1547,31 +1566,32 @@ button { font: inherit; color: inherit; }
     g.addColorStop(0, 'rgba(255,238,208,.10)');
     g.addColorStop(0.35, 'rgba(255,238,208,.02)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    rrect(ctx, 0, 0, VW, VH, 20);
+    rrect(ctx, 0, 0, VW, VH, 16);
     ctx.fillStyle = g; ctx.fill();
 
-    var v = ctx.createRadialGradient(VW / 2, VH * 0.42, VH * 0.30, VW / 2, VH * 0.5, VH * 0.95);
+    var v = ctx.createRadialGradient(VW / 2, VH * 0.44, VH * 0.30, VW / 2, VH * 0.5, VH * 0.9);
     v.addColorStop(0, 'rgba(0,0,0,0)');
-    v.addColorStop(1, 'rgba(0,0,0,.5)');
-    rrect(ctx, 0, 0, VW, VH, 20);
+    v.addColorStop(1, 'rgba(0,0,0,.46)');
+    rrect(ctx, 0, 0, VW, VH, 16);
     ctx.fillStyle = v; ctx.fill();
   }
 
   function render(canvas) {
     var w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
-    var dpr = Math.min(global.devicePixelRatio || 1, 2.5);
+    /* честная плотность экрана: на айфоне она 3, и обрезать её нельзя — мылит */
+    var dpr = Math.min(global.devicePixelRatio || 1, 3);
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     var ctx = canvas.getContext('2d');
-    var k = (tall ? h : w) * dpr / VW;
+    var k = w * dpr / VW;
     ctx.setTransform(k, 0, 0, k, 0, 0);
-    if (tall) { ctx.translate(VH, 0); ctx.rotate(Math.PI / 2); }
+    if (flip) { ctx.translate(VW, VH); ctx.rotate(Math.PI); }
     ctx.clearRect(0, 0, VW, VH);
     drawFrame(ctx);
     drawBed(ctx);
-    drawTray(ctx, 'l');
-    drawTray(ctx, 'r');
+    drawShelf(ctx, 'w');
+    drawShelf(ctx, 'b');
     drawPoints(ctx);
     drawBar(ctx);
     drawLight(ctx);
@@ -1763,8 +1783,8 @@ button { font: inherit; color: inherit; }
   }
 
   global.NardyBoard = {
-    VW: VW, VH: VH, CD: CD, DD: DD, PTW: PTW, PTH: PTH, FY0: FY0, FY1: FY1,
-    setTall: setTall, isTall: isTall, vw: vw, vh: vh, map: map,
+    VW: VW, VH: VH, CD: CD, DD: DD, COL: COL, PTH: PTH,
+    setFlip: setFlip, isFlip: isFlip, vw: vw, vh: vh, map: map,
     geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt,
     gapFor: gapFor, render: render, checker: checker, die: die
   };
@@ -2654,24 +2674,34 @@ button { font: inherit; color: inherit; }
     return v;
   }
 
-  /* Доска занимает всё, что осталось от экрана; на телефоне встаёт вертикально */
+  /* Доска лежит горизонтально и занимает всю ширину экрана.
+     Таблички игроков прижимаются к ней вплотную, а свободная высота
+     уходит наружу — иначе вокруг доски зияют пустые поля. */
   function fit() {
-    var tall = window.innerWidth < window.innerHeight * 0.95;
-    if (tall !== B.isTall()) { B.setTall(tall); buildZones(); }
-    var w = stage.clientWidth, h = stage.clientHeight;
-    if (!w || !h) return;
+    var tbl = document.querySelector('.table');
+    var w = tbl.clientWidth;
+    var h = tbl.clientHeight - $('pl-w').offsetHeight - $('pl-b').offsetHeight - 20;
+    if (!w || h < 120) return;
     var ar = B.vw() / B.vh();
     if (w / h > ar) w = h * ar; else h = w / ar;
     board.style.width = Math.floor(w) + 'px';
     board.style.height = Math.floor(h) + 'px';
+    stage.style.flex = 'none';
+    stage.style.height = Math.floor(h) + 'px';
   }
 
-  /* Свой цвет всегда снизу — как за настоящим столом */
+  /* Свой цвет снизу, свой дом — в ближнем углу: как за настоящим столом */
   function setSides() {
     var my = isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : 'w');
     $('pl-w').style.order = my === 'b' ? '0' : '2';
     $('pl-b').style.order = my === 'b' ? '2' : '0';
     stage.style.order = '1';
+    if (B.isFlip() !== (my === 'w')) {
+      B.setFlip(my === 'w');
+      buildZones();
+      B.render(scene);
+      if (VIS) place(true);
+    }
   }
 
   function scale() { return board.clientWidth / B.vw(); }
