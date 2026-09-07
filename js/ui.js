@@ -408,7 +408,6 @@
   function quip(event, who, force) {
     var text = NardyBanter.line(opts.banter, event, sideOf(who), force);
     if (!text) return;
-    if (opts.sound) NardyVoice.speak(text);
     var q = $('quip');
     q.textContent = text;
     q.classList.add('show');
@@ -417,7 +416,6 @@
   }
 
   function hushQuip() {
-    NardyVoice.hush();
     $('quip').classList.remove('show');
     clearTimeout(quip._t);
   }
@@ -1299,7 +1297,6 @@
   function newGame() {
     /* «по сети» без стола — это не партия, а недоразумение */
     if (opts.mode === 'net' && !net.code) { netSheet(); return; }
-    NardyVoice.prime();
     closeSheet();
     hushQuip();
     bf = {}; NardyBanter.reset();
@@ -1342,7 +1339,6 @@
   $('act-hint').addEventListener('click', hint);
   $('act-sound').addEventListener('click', function () {
     opts.sound = !opts.sound;
-    if (!opts.sound) NardyVoice.hush(); else NardyVoice.prime();
     save();
     if (opts.sound) sfx('move');
     updateUI();
@@ -1432,6 +1428,7 @@
   fit();
   buildZones();
   B.render(scene);
+  B.loadArt(function () { B.render(scene); });   /* герб приезжает отдельно */
   NardyDice.attach($('dicefx'));
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { B.render(scene); });

@@ -421,9 +421,15 @@
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    /* воровские звёзды в поле между рядами */
-    thiefStar(ctx, (colX(0) + colX(5) + COL) / 2, TOPY + PTH + MID / 2, 52);
-    thiefStar(ctx, (colX(6) + colX(11) + COL) / 2, TOPY + PTH + MID / 2, 52);
+    /* золотой герб в поле между рядами, по одному на половину */
+    var my = TOPY + PTH + MID / 2;
+    if (gerb) {
+      drawGerb(ctx, (colX(0) + colX(5) + COL) / 2, my, MID * 0.96);
+      drawGerb(ctx, (colX(6) + colX(11) + COL) / 2, my, MID * 0.96);
+    } else {
+      thiefStar(ctx, (colX(0) + colX(5) + COL) / 2, my, 52);
+      thiefStar(ctx, (colX(6) + colX(11) + COL) / 2, my, 52);
+    }
 
     /* латунная нить вдоль домов */
     ctx.strokeStyle = 'rgba(200,162,74,.45)';
@@ -468,6 +474,61 @@
     drawPoints(ctx);
     drawBar(ctx);
     drawLight(ctx);
+  }
+
+  /* ---------- герб ---------- */
+
+  var gerb = null;
+
+  /* Официальный герб — общественное достояние. Перекрашиваем в золото,
+     сохраняя светотень: так он ложится в дерево как инкрустация. */
+  function loadArt(done) {
+    var im = new global.Image();
+    im.onload = function () {
+      var h = 460, w = Math.round(h * 12331.1 / 14589.7);
+      var c = global.document.createElement('canvas');
+      c.width = w; c.height = h;
+      var x = c.getContext('2d');
+      x.drawImage(im, 0, 0, w, h);
+
+      /* В гербе орёл золотой, щит красный. Берём только светлое —
+         так остаётся один орёл, а щит уходит, и герб ложится
+         в дерево инкрустацией, а не золотой табличкой. */
+      var d = x.getImageData(0, 0, w, h), q = d.data, i, lum, a2, t;
+      for (i = 0; i < q.length; i += 4) {
+        if (!q[i + 3]) continue;
+        lum = (q[i] * 0.299 + q[i + 1] * 0.587 + q[i + 2] * 0.114) / 255;
+        a2 = (lum - 0.30) / 0.42;
+        a2 = a2 < 0 ? 0 : a2 > 1 ? 1 : a2;
+        q[i + 3] = Math.round(q[i + 3] * a2);
+        t = (i / 4 / w) / h;                       /* сверху светлее, снизу темнее */
+        q[i]     = Math.round(206 + 40 * (1 - t) - 30 * (1 - lum));
+        q[i + 1] = Math.round(166 + 36 * (1 - t) - 34 * (1 - lum));
+        q[i + 2] = Math.round(78 + 34 * (1 - t) - 30 * (1 - lum));
+      }
+      x.putImageData(d, 0, 0);
+      gerb = c;
+      if (done) done();
+    };
+    im.onerror = function () { if (done) done(); };
+    im.src = 'assets/gerb.svg';
+  }
+
+  /* Инкрустация: тёмный отпечаток снизу, золото сверху, блик по краю */
+  function drawGerb(ctx, cx, cy, h) {
+    if (!gerb) return;
+    var w = h * gerb.width / gerb.height;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.filter = 'blur(1.5px) brightness(0)';
+    ctx.drawImage(gerb, cx - w / 2 + 2.5, cy - h / 2 + 3, w, h);
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+    ctx.drawImage(gerb, cx - w / 2, cy - h / 2, w, h);
+    ctx.globalAlpha = 0.30;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(gerb, cx - w / 2 - 1, cy - h / 2 - 1.5, w, h);
+    ctx.restore();
   }
 
   /* ---------- шашки и кости картинками ---------- */
@@ -686,7 +747,7 @@
 
   global.NardyBoard = {
     VW: VW, VH: VH, CD: CD, DD: DD, COL: COL, PTH: PTH,
-    setFlip: setFlip, isFlip: isFlip, vw: vw, vh: vh, map: map,
+    setFlip: setFlip, isFlip: isFlip, vw: vw, vh: vh, map: map, loadArt: loadArt,
     geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt,
     gapFor: gapFor, render: render, checker: checker, die: die
   };

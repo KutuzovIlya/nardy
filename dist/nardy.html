@@ -1609,9 +1609,15 @@ button { font: inherit; color: inherit; }
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    /* воровские звёзды в поле между рядами */
-    thiefStar(ctx, (colX(0) + colX(5) + COL) / 2, TOPY + PTH + MID / 2, 52);
-    thiefStar(ctx, (colX(6) + colX(11) + COL) / 2, TOPY + PTH + MID / 2, 52);
+    /* золотой герб в поле между рядами, по одному на половину */
+    var my = TOPY + PTH + MID / 2;
+    if (gerb) {
+      drawGerb(ctx, (colX(0) + colX(5) + COL) / 2, my, MID * 0.96);
+      drawGerb(ctx, (colX(6) + colX(11) + COL) / 2, my, MID * 0.96);
+    } else {
+      thiefStar(ctx, (colX(0) + colX(5) + COL) / 2, my, 52);
+      thiefStar(ctx, (colX(6) + colX(11) + COL) / 2, my, 52);
+    }
 
     /* латунная нить вдоль домов */
     ctx.strokeStyle = 'rgba(200,162,74,.45)';
@@ -1656,6 +1662,61 @@ button { font: inherit; color: inherit; }
     drawPoints(ctx);
     drawBar(ctx);
     drawLight(ctx);
+  }
+
+  /* ---------- герб ---------- */
+
+  var gerb = null;
+
+  /* Официальный герб — общественное достояние. Перекрашиваем в золото,
+     сохраняя светотень: так он ложится в дерево как инкрустация. */
+  function loadArt(done) {
+    var im = new global.Image();
+    im.onload = function () {
+      var h = 460, w = Math.round(h * 12331.1 / 14589.7);
+      var c = global.document.createElement('canvas');
+      c.width = w; c.height = h;
+      var x = c.getContext('2d');
+      x.drawImage(im, 0, 0, w, h);
+
+      /* В гербе орёл золотой, щит красный. Берём только светлое —
+         так остаётся один орёл, а щит уходит, и герб ложится
+         в дерево инкрустацией, а не золотой табличкой. */
+      var d = x.getImageData(0, 0, w, h), q = d.data, i, lum, a2, t;
+      for (i = 0; i < q.length; i += 4) {
+        if (!q[i + 3]) continue;
+        lum = (q[i] * 0.299 + q[i + 1] * 0.587 + q[i + 2] * 0.114) / 255;
+        a2 = (lum - 0.30) / 0.42;
+        a2 = a2 < 0 ? 0 : a2 > 1 ? 1 : a2;
+        q[i + 3] = Math.round(q[i + 3] * a2);
+        t = (i / 4 / w) / h;                       /* сверху светлее, снизу темнее */
+        q[i]     = Math.round(206 + 40 * (1 - t) - 30 * (1 - lum));
+        q[i + 1] = Math.round(166 + 36 * (1 - t) - 34 * (1 - lum));
+        q[i + 2] = Math.round(78 + 34 * (1 - t) - 30 * (1 - lum));
+      }
+      x.putImageData(d, 0, 0);
+      gerb = c;
+      if (done) done();
+    };
+    im.onerror = function () { if (done) done(); };
+    im.src = 'assets/gerb.svg';
+  }
+
+  /* Инкрустация: тёмный отпечаток снизу, золото сверху, блик по краю */
+  function drawGerb(ctx, cx, cy, h) {
+    if (!gerb) return;
+    var w = h * gerb.width / gerb.height;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.filter = 'blur(1.5px) brightness(0)';
+    ctx.drawImage(gerb, cx - w / 2 + 2.5, cy - h / 2 + 3, w, h);
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+    ctx.drawImage(gerb, cx - w / 2, cy - h / 2, w, h);
+    ctx.globalAlpha = 0.30;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(gerb, cx - w / 2 - 1, cy - h / 2 - 1.5, w, h);
+    ctx.restore();
   }
 
   /* ---------- шашки и кости картинками ---------- */
@@ -1874,7 +1935,7 @@ button { font: inherit; color: inherit; }
 
   global.NardyBoard = {
     VW: VW, VH: VH, CD: CD, DD: DD, COL: COL, PTH: PTH,
-    setFlip: setFlip, isFlip: isFlip, vw: vw, vh: vh, map: map,
+    setFlip: setFlip, isFlip: isFlip, vw: vw, vh: vh, map: map, loadArt: loadArt,
     geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt,
     gapFor: gapFor, render: render, checker: checker, die: die
   };
@@ -2388,98 +2449,6 @@ button { font: inherit; color: inherit; }
   function reset() { quiet = 0; last = {}; }
 
   global.NardyBanter = { line: line, reset: reset };
-})(window);
-</script>
-<script>
-/* ============================================================
-   Голос за столом. Системный синтезатор речи умеет по-русски,
-   но акцента у него нет. Поэтому на экран идёт обычный текст,
-   а синтезатору подсовывается тот же текст, переписанный
-   «как слышится»: без мягкости, без «ы», с «э» вместо «е».
-   ============================================================ */
-(function (global) {
-  'use strict';
-
-  var S = global.speechSynthesis || null;
-  var voice = null, picked = false;
-
-  function pick() {
-    if (picked || !S) return voice;
-    var list = [];
-    try { list = S.getVoices() || []; } catch (e) { list = []; }
-    if (!list.length) return null;          /* список приходит не сразу */
-    picked = true;
-    var ru = list.filter(function (v) { return /^ru/i.test(v.lang || ''); });
-    /* мужской голос звучит уместнее, но берём любой русский */
-    voice = ru.filter(function (v) { return /(yuri|pavel|male|дмитр|юри)/i.test(v.name); })[0] || ru[0] || null;
-    return voice;
-  }
-
-  if (S && typeof S.addEventListener === 'function') {
-    S.addEventListener('voiceschanged', function () { picked = false; pick(); });
-  }
-
-  var HARD = 'бвгджзйклмнпрстфхцчшщ';
-
-  /* Переписываем под южный говор: «нэ», «ти», «толко», «шо» */
-  function accent(text) {
-    var out = '', i, ch, prev;
-    /* \b в JS не знает кириллицы, поэтому границу слова ищем вручную */
-    text = text.replace(/(^|[^а-яёА-ЯЁ])([Чч])то(?![а-яёА-ЯЁ])/g, function (m, pre, c) {
-      return pre + (c === 'Ч' ? 'Шо' : 'шо');
-    });
-    for (i = 0; i < text.length; i++) {
-      ch = text[i];
-      prev = (out[out.length - 1] || '').toLowerCase();
-      if (ch === 'ы') ch = 'и';
-      else if (ch === 'Ы') ch = 'И';
-      else if (ch === 'ё') ch = 'о';
-      else if (ch === 'Ё') ch = 'О';
-      else if (ch === 'щ') ch = 'ш';
-      else if (ch === 'Щ') ch = 'Ш';
-      else if (ch === 'е' && HARD.indexOf(prev) >= 0) ch = 'э';
-      else if (ch === 'ь') {
-        var next = (text[i + 1] || '').toLowerCase();
-        /* мягкий знак убираем, кроме случаев, где без него каша */
-        if (!next || HARD.indexOf(next) >= 0) ch = '';
-      }
-      out += ch;
-    }
-    return out;
-  }
-
-  function speak(text) {
-    if (!S || !text) return;
-    var v = pick();
-    if (!v) return;                          /* русского голоса нет — молчим */
-    try {
-      S.cancel();
-      var u = new global.SpeechSynthesisUtterance(accent(text));
-      u.voice = v;
-      u.lang = v.lang || 'ru-RU';
-      u.rate = 0.92;
-      u.pitch = 0.78;                        /* ниже — солиднее */
-      u.volume = 1;
-      S.speak(u);
-    } catch (e) {}
-  }
-
-  function hush() { if (S) { try { S.cancel(); } catch (e) {} } }
-
-  /* На айфоне синтезатор просыпается только после касания экрана,
-     поэтому будим его беззвучной фразой прямо в обработчике кнопки */
-  function prime() {
-    if (!S) return;
-    try {
-      var u = new global.SpeechSynthesisUtterance(' ');
-      u.volume = 0;
-      S.speak(u);
-    } catch (e) {}
-  }
-
-  function ready() { return !!(S && pick()); }
-
-  global.NardyVoice = { speak: speak, hush: hush, ready: ready, accent: accent, prime: prime };
 })(window);
 </script>
 <script>
@@ -3339,7 +3308,6 @@ button { font: inherit; color: inherit; }
   function quip(event, who, force) {
     var text = NardyBanter.line(opts.banter, event, sideOf(who), force);
     if (!text) return;
-    if (opts.sound) NardyVoice.speak(text);
     var q = $('quip');
     q.textContent = text;
     q.classList.add('show');
@@ -3348,7 +3316,6 @@ button { font: inherit; color: inherit; }
   }
 
   function hushQuip() {
-    NardyVoice.hush();
     $('quip').classList.remove('show');
     clearTimeout(quip._t);
   }
@@ -4230,7 +4197,6 @@ button { font: inherit; color: inherit; }
   function newGame() {
     /* «по сети» без стола — это не партия, а недоразумение */
     if (opts.mode === 'net' && !net.code) { netSheet(); return; }
-    NardyVoice.prime();
     closeSheet();
     hushQuip();
     bf = {}; NardyBanter.reset();
@@ -4273,7 +4239,6 @@ button { font: inherit; color: inherit; }
   $('act-hint').addEventListener('click', hint);
   $('act-sound').addEventListener('click', function () {
     opts.sound = !opts.sound;
-    if (!opts.sound) NardyVoice.hush(); else NardyVoice.prime();
     save();
     if (opts.sound) sfx('move');
     updateUI();
@@ -4363,6 +4328,7 @@ button { font: inherit; color: inherit; }
   fit();
   buildZones();
   B.render(scene);
+  B.loadArt(function () { B.render(scene); });   /* герб приезжает отдельно */
   NardyDice.attach($('dicefx'));
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { B.render(scene); });
