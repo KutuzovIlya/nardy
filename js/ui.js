@@ -672,11 +672,6 @@
 
   function onDown(e) {
     if (!canPlay()) return;
-    var spot = e.target.closest ? e.target.closest('.spot') : null;
-    if (spot) {
-      tryMoveTo(+spot.dataset.to, +spot.dataset.die);
-      return;
-    }
     var z = e.target.closest ? e.target.closest('.zone') : null;
     if (!z) { clearSel(); return; }
     if (z.dataset.tray) {
@@ -693,8 +688,7 @@
       clearSel();
       return;
     }
-    if (sel === i) { clearSel(); return; }
-    pick(i);
+    if (sel !== i) pick(i);          /* по своей же шашке — сразу тащим */
     var ids = VIS.pts[i];
     var id = ids[ids.length - 1];
     drag = { id: id, from: i, x0: e.clientX, y0: e.clientY, moved: false };
@@ -709,30 +703,59 @@
     var el = men[drag.id], p = pos[drag.id];
     el.style.transition = 'none';
     el.style.zIndex = 30;
-    el.style.transform = 'translate3d(' + (p.x + dx) + 'px,' + (p.y + dy) + 'px,0) scale(1.1)';
+    el.classList.add('carry');
+    el.style.transform = 'translate3d(' + (p.x + dx) + 'px,' + (p.y + dy - B.CD * scale() * 0.18) +
+      'px,0) scale(1.16)';
+  }
+
+  /* Куда упала шашка. Палец редко попадает точно, поэтому если промах —
+     берём ближайший доступный пункт в пределах полутора шашек. */
+  function dropTarget(cx, cy) {
+    var el = document.elementFromPoint(cx, cy);
+    var z = el && el.closest ? el.closest('.zone') : null;
+    if (z) {
+      if (z.dataset.tray) {
+        if (z.dataset.tray === S.turn && reach[N.OFF]) return N.OFF;
+      } else if (reach[+z.dataset.i]) return +z.dataset.i;
+    }
+    var r = board.getBoundingClientRect(), k = r.width / B.vw();
+    var bx = (cx - r.left) / k, by = (cy - r.top) / k;
+    var best = null, bd = 1e9;
+    Object.keys(reach).forEach(function (key) {
+      var to = +key, p, n;
+      if (to === N.OFF) p = B.trayAt(S.turn, VIS.off[S.turn].length);
+      else { n = VIS.pts[to].length + 1; p = B.manAt(to, n - 1, n); }
+      var q = B.map(p.x, p.y, B.CD, B.CD);
+      var ddx = bx - (q.x + B.CD / 2), ddy = by - (q.y + B.CD / 2);
+      var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      if (dist < bd) { bd = dist; best = to; }
+    });
+    return (best !== null && bd < B.CD * 1.7) ? best : null;
   }
 
   function onCancel() {
     if (!drag) return;
+    var el = men[drag.id];
+    el.style.transition = '';
+    el.classList.remove('carry');
     drag = null;
     place(false);
   }
 
   function onUp(e) {
     if (!drag) return;
-    var d = drag; drag = null;
+    var d = drag;
+    drag = null;
     try { lZones.releasePointerCapture(e.pointerId); } catch (err) {}
-    if (!d.moved) return;
-    men[d.id].style.transition = '';
-    lSpots.style.pointerEvents = 'none';
-    var under = document.elementFromPoint(e.clientX, e.clientY);
-    lSpots.style.pointerEvents = '';
-    var spot = under && under.closest ? under.closest('.spot') : null;
-    var zone = under && under.closest ? under.closest('.zone') : null;
-    var ok = false;
-    if (zone && zone.dataset.tray === S.turn) ok = tryMoveTo(N.OFF);
-    else if (zone && !zone.dataset.tray) ok = tryMoveTo(+zone.dataset.i);
-    if (!ok) place(false);
+    var el = men[d.id];
+    el.style.transition = '';
+    el.classList.remove('carry');
+    if (!d.moved) { place(false); return; }      /* просто нажали — шашка выбрана */
+    var to = dropTarget(e.clientX, e.clientY);
+    if (to === null || !tryMoveTo(to)) {
+      sfx('no');
+      place(false);
+    }
   }
 
   /* ---------- подсказка ---------- */

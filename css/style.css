@@ -239,6 +239,12 @@ button { font: inherit; color: inherit; }
 
 .man.pick { z-index: 6; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .7)) brightness(1.08); }
 
+/* шашка в руке: приподнята и отбрасывает длинную тень */
+.man.carry {
+  z-index: 30;
+  filter: drop-shadow(0 16px 18px rgba(0, 0, 0, .75)) brightness(1.12);
+}
+
 .man.pick::before,
 .man.hint::before {
   content: "";

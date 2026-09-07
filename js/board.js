@@ -594,8 +594,8 @@
     6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]]
   };
 
-  /* Гранитный кубик: синий камень с крапом, прожилками и полировкой.
-     Точки высверлены — тёмная лунка со светлым краем, где ловит свет. */
+  /* Гранитный кубик: белый камень с чёрным крапом, прожилками и
+     полировкой. Точки высверлены — тёмная лунка со светлым краем. */
   function die(side, value, px) {
     var key = 'die' + side + value + px;
     if (cache[key]) return cache[key];
@@ -607,9 +607,9 @@
 
       var g = ctx.createLinearGradient(0, 0, s * 0.85, s);
       if (pale) {
-        g.addColorStop(0, '#7C93AE'); g.addColorStop(0.45, '#5A7391'); g.addColorStop(1, '#33475F');
+        g.addColorStop(0, '#F4F3EF'); g.addColorStop(0.45, '#DEDDD7'); g.addColorStop(1, '#B0AFA8');
       } else {
-        g.addColorStop(0, '#42597A'); g.addColorStop(0.45, '#2B3E58'); g.addColorStop(1, '#151F2E');
+        g.addColorStop(0, '#CFCDC5'); g.addColorStop(0.45, '#AFADA4'); g.addColorStop(1, '#7E7C74');
       }
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, s, s);
@@ -620,9 +620,9 @@
         var t = gr();
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 6.284);
-        ctx.fillStyle = t > 0.72 ? 'rgba(226,236,248,' + (0.20 + gr() * 0.5).toFixed(2) + ')'
-          : t > 0.42 ? 'rgba(10,16,26,' + (0.18 + gr() * 0.45).toFixed(2) + ')'
-          : 'rgba(150,172,198,' + (0.10 + gr() * 0.28).toFixed(2) + ')';
+        ctx.fillStyle = t > 0.70 ? 'rgba(24,22,18,' + (0.30 + gr() * 0.55).toFixed(2) + ')'
+          : t > 0.40 ? 'rgba(255,255,252,' + (0.30 + gr() * 0.5).toFixed(2) + ')'
+          : 'rgba(122,118,108,' + (0.14 + gr() * 0.34).toFixed(2) + ')';
         ctx.fill();
       }
 
@@ -633,7 +633,7 @@
         ctx.moveTo(-2, y0);
         ctx.bezierCurveTo(s * 0.3, y0 + (gr() - 0.5) * s * 0.3,
                           s * 0.7, y0 + (gr() - 0.5) * s * 0.3, s + 2, y0 + (gr() - 0.5) * s * 0.2);
-        ctx.strokeStyle = gr() > 0.5 ? 'rgba(206,222,240,.13)' : 'rgba(8,14,22,.20)';
+        ctx.strokeStyle = gr() > 0.5 ? 'rgba(255,255,250,.22)' : 'rgba(30,27,22,.16)';
         ctx.lineWidth = 0.6 + gr() * 1.6;
         ctx.stroke();
       }
@@ -642,9 +642,9 @@
         var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.088;
         /* лунка */
         var pg = ctx.createRadialGradient(cx + rr * 0.32, cy + rr * 0.36, rr * 0.06, cx, cy, rr);
-        pg.addColorStop(0, pale ? '#1B2836' : '#0A121C');
-        pg.addColorStop(0.72, pale ? '#101A25' : '#060B12');
-        pg.addColorStop(1, pale ? '#2C4058' : '#16212F');
+        pg.addColorStop(0, '#3A362E');
+        pg.addColorStop(0.72, '#1A1813');
+        pg.addColorStop(1, '#4A463C');
         ctx.beginPath();
         ctx.arc(cx, cy, rr, 0, 6.284);
         ctx.fillStyle = pg;
@@ -652,30 +652,30 @@
         /* светлый край сверху-слева — свет на кромке отверстия */
         ctx.beginPath();
         ctx.arc(cx, cy, rr * 0.98, Math.PI * 0.9, Math.PI * 1.9);
-        ctx.strokeStyle = 'rgba(216,232,250,.42)';
+        ctx.strokeStyle = 'rgba(255,255,250,.62)';
         ctx.lineWidth = s * 0.014;
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(cx, cy, rr * 0.98, Math.PI * 1.9, Math.PI * 2.9);
-        ctx.strokeStyle = 'rgba(6,10,16,.4)';
+        ctx.strokeStyle = 'rgba(40,36,28,.42)';
         ctx.lineWidth = s * 0.012;
         ctx.stroke();
       });
 
       /* полировка */
       var hi = ctx.createLinearGradient(0, 0, s * 0.55, s * 0.65);
-      hi.addColorStop(0, 'rgba(233,243,255,' + (pale ? 0.40 : 0.24) + ')');
-      hi.addColorStop(0.55, 'rgba(233,243,255,0)');
+      hi.addColorStop(0, 'rgba(255,255,252,' + (pale ? 0.52 : 0.34) + ')');
+      hi.addColorStop(0.55, 'rgba(255,255,252,0)');
       ctx.fillStyle = hi;
       ctx.fillRect(0, 0, s, s);
       var sh = ctx.createLinearGradient(s * 0.35, s * 0.45, s, s);
       sh.addColorStop(0, 'rgba(0,0,0,0)');
-      sh.addColorStop(1, 'rgba(2,6,12,.5)');
+      sh.addColorStop(1, 'rgba(38,34,26,.36)');
       ctx.fillStyle = sh;
       ctx.fillRect(0, 0, s, s);
 
       /* скол кромки */
-      ctx.strokeStyle = 'rgba(222,236,252,.22)';
+      ctx.strokeStyle = 'rgba(255,255,250,.34)';
       ctx.lineWidth = s * 0.012;
       rrect(ctx, 2, 2, s - 4, s - 4, s * 0.16);
       ctx.stroke();
