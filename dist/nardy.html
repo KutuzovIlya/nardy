@@ -362,15 +362,17 @@ button { font: inherit; color: inherit; }
 }
 
 .quip {
-  top: 2%;
+  /* чуть выше середины: ровно по центру она накрывала кости */
+  top: 34%;
+  margin-top: -1.4em;
   padding: 9px 20px;
   border-radius: 999px;
-  background: rgba(12, 9, 6, .84);
+  background: rgba(12, 9, 6, .78);
   border: 1px solid rgba(200, 162, 74, .34);
   box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
   font-family: Forum, Georgia, serif;
-  font-size: clamp(15px, 4vw, 20px);
-  color: #F2E4C2;
+  font-size: clamp(14px, 3.7vw, 19px);
+  color: #F4E7C8;
   text-wrap: balance;
   backdrop-filter: blur(4px);
 }
@@ -395,8 +397,8 @@ button { font: inherit; color: inherit; }
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 13px;
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -426,7 +428,7 @@ button { font: inherit; color: inherit; }
 
 .pname {
   font-family: Forum, Georgia, serif;
-  font-size: 17px;
+  font-size: 19px;
   letter-spacing: .07em;
   text-transform: uppercase;
   line-height: 1.15;
@@ -440,70 +442,39 @@ button { font: inherit; color: inherit; }
   text-overflow: ellipsis;
 }
 
-.pstats { margin-left: auto; display: flex; gap: 13px; text-align: right; }
-.pstats div { display: flex; flex-direction: column; }
-
-.pstats b {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 1.1;
-}
-
-.pstats span {
-  font-size: 8px;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-
-/* ---------- журнал ---------- */
-
-.log {
+/* аватарка: фото из Telegram, иначе шашка своего цвета */
+.ava {
+  position: relative;
+  width: 46px;
+  height: 46px;
   flex: none;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
-  padding: 9px 4px 9px 13px;
-  display: none;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 1px var(--line);
 }
 
-.log h2 {
-  margin: 0 0 5px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 9px;
+.ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ava .disc { width: 100%; height: 100%; }
+
+.turn {
+  margin-left: auto;
+  flex: none;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--brass-lit), var(--brass));
+  color: #14100A;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: .24em;
+  letter-spacing: .14em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  opacity: 0;
+  transform: scale(.85);
+  transition: opacity .25s, transform .25s var(--ease);
 }
 
-.log ol {
-  margin: 0;
-  padding: 0 10px 0 0;
-  list-style: none;
-  max-height: 84px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 3px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-dim);
-  mask-image: linear-gradient(to top, transparent, #000 20px);
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
-}
-
-.log li { display: flex; gap: 8px; }
-.log li b { font-weight: 500; color: var(--text); min-width: 52px; }
-.log li.b b { color: var(--brass); }
-
-/* журнал показываем там, где под доской осталось место */
-@media (min-height: 700px) {
-  .log { display: block; }
-}
+.plaque.act .turn { opacity: 1; transform: none; }
 
 /* ---------- диалоги ---------- */
 
@@ -522,6 +493,11 @@ button { font: inherit; color: inherit; }
 }
 
 .veil.show { opacity: 1; pointer-events: auto; }
+
+/* в Telegram окно ниже, чем думает браузер: иначе низ диалога
+   с кнопкой «Начать» уезжает под интерфейс мессенджера */
+.tg .veil { bottom: auto; height: var(--tgh, 100dvh); }
+.veil { overflow-y: auto; }
 
 .sheet {
   width: min(460px, 100%);
@@ -737,15 +713,12 @@ button { font: inherit; color: inherit; }
 
   <main class="table">
     <div class="plaque" id="pl-b">
-      <span class="disc b"></span>
+      <span class="ava" id="ava-b"><span class="disc b"></span></span>
       <div class="pwho">
         <div class="pname">Чёрные</div>
         <div class="pmeta" id="meta-b">Компьютер</div>
       </div>
-      <div class="pstats">
-        <div><b id="pip-b">360</b><span>пипсы</span></div>
-        <div><b id="off-b">0</b><span>снято</span></div>
-      </div>
+      <span class="turn">ходит</span>
     </div>
 
     <div class="stage" id="stage">
@@ -761,22 +734,14 @@ button { font: inherit; color: inherit; }
     </div>
 
     <div class="plaque" id="pl-w">
-      <span class="disc w"></span>
+      <span class="ava" id="ava-w"><span class="disc w"></span></span>
       <div class="pwho">
         <div class="pname">Белые</div>
         <div class="pmeta" id="meta-w">Игрок</div>
       </div>
-      <div class="pstats">
-        <div><b id="pip-w">360</b><span>пипсы</span></div>
-        <div><b id="off-w">0</b><span>снято</span></div>
-      </div>
+      <span class="turn">ходит</span>
     </div>
   </main>
-
-  <section class="log">
-    <h2>Ход за ходом</h2>
-    <ol id="log"></ol>
-  </section>
 
 </div>
 
@@ -1340,14 +1305,14 @@ button { font: inherit; color: inherit; }
     ctx.save();
     ctx.lineCap = 'round';
     ctx.translate(0, -depth);
-    ctx.strokeStyle = 'rgba(255,226,180,' + (light || 0.30) + ')';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(255,232,192,' + (light || 0.30) + ')';
+    ctx.lineWidth = 1.8;
     path(ctx);
     ctx.restore();
     ctx.save();
     ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(20,9,3,.55)';
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = 'rgba(16,7,2,.75)';
+    ctx.lineWidth = 2.6;
     path(ctx);
     ctx.restore();
   }
@@ -1391,6 +1356,65 @@ button { font: inherit; color: inherit; }
     g.addColorStop(1, 'rgba(24,11,4,.45)');
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.28, 0, 6.284);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* Восьмиконечная воровская звезда — главный знак на таких досках */
+  function thiefStar(ctx, cx, cy, r) {
+    var i, a;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    /* два квадрата, повёрнутые друг относительно друга */
+    [0, Math.PI / 4].forEach(function (turn) {
+      cut(ctx, function (c) {
+        c.beginPath();
+        for (i = 0; i < 4; i++) {
+          a = turn + i * Math.PI / 2;
+          var x = Math.cos(a) * r, y = Math.sin(a) * r;
+          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        }
+        c.closePath();
+        c.stroke();
+      }, 1, 0.30);
+    });
+
+    /* лучи от центра к вершинам */
+    cut(ctx, function (c) {
+      c.beginPath();
+      for (i = 0; i < 8; i++) {
+        a = i * Math.PI / 4;
+        c.moveTo(Math.cos(a) * r * 0.20, Math.sin(a) * r * 0.20);
+        c.lineTo(Math.cos(a) * r * 0.97, Math.sin(a) * r * 0.97);
+      }
+      c.stroke();
+    }, 1, 0.22);
+
+    /* грани лучей — чтобы звезда читалась объёмной */
+    ctx.save();
+    for (i = 0; i < 8; i++) {
+      a = i * Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.97, Math.sin(a) * r * 0.97);
+      ctx.lineTo(Math.cos(a + Math.PI / 8) * r * 0.42, Math.sin(a + Math.PI / 8) * r * 0.42);
+      ctx.lineTo(Math.cos(a - Math.PI / 8) * r * 0.42, Math.sin(a - Math.PI / 8) * r * 0.42);
+      ctx.closePath();
+      ctx.fillStyle = i % 2 ? 'rgba(255,230,190,.13)' : 'rgba(18,8,2,.34)';
+      ctx.fill();
+    }
+    ctx.restore();
+
+    [r * 0.20, r * 0.42].forEach(function (rr) {
+      cut(ctx, function (c) { c.beginPath(); c.arc(0, 0, rr, 0, 6.284); c.stroke(); }, 1, 0.24);
+    });
+
+    var g = ctx.createRadialGradient(-r * 0.08, -r * 0.08, 1, 0, 0, r * 0.20);
+    g.addColorStop(0, 'rgba(255,224,170,.22)');
+    g.addColorStop(1, 'rgba(24,11,4,.5)');
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.19, 0, 6.284);
     ctx.fillStyle = g;
     ctx.fill();
     ctx.restore();
@@ -1443,7 +1467,7 @@ button { font: inherit; color: inherit; }
     ctx.restore();
 
     [[c + 1, c + 1], [VW - c - 1, c + 1], [c + 1, VH - c - 1], [VW - c - 1, VH - c - 1]]
-      .forEach(function (p) { rosette(ctx, p[0], p[1], 9, 8); });
+      .forEach(function (p) { thiefStar(ctx, p[0], p[1], 8); });
 
     ctx.strokeStyle = 'rgba(200,162,74,.42)';
     ctx.lineWidth = 1.1;
@@ -1485,7 +1509,7 @@ button { font: inherit; color: inherit; }
     ctx.strokeStyle = 'rgba(200,162,74,.28)';
     ctx.lineWidth = 1;
     rrect(ctx, b.x, b.y, b.w, b.h, 8); ctx.stroke();
-    label(ctx, player === 'w' ? b.x + 40 : b.x + b.w - 40, b.y + b.h / 2, 'ДОМ');
+    thiefStar(ctx, b.x + b.w / 2, b.y + b.h / 2, 26);
   }
 
   /* Надпись стоит ровно, даже если доска развёрнута на 180° */
@@ -1548,9 +1572,9 @@ button { font: inherit; color: inherit; }
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    /* резные солнца в поле между рядами */
-    rosette(ctx, colX(3) + COL / 2, TOPY + PTH + MID / 2, 34, 12);
-    rosette(ctx, colX(9) + COL / 2, TOPY + PTH + MID / 2, 34, 12);
+    /* воровские звёзды в поле между рядами */
+    thiefStar(ctx, (colX(0) + colX(5) + COL) / 2, TOPY + PTH + MID / 2, 52);
+    thiefStar(ctx, (colX(6) + colX(11) + COL) / 2, TOPY + PTH + MID / 2, 52);
 
     /* латунная нить вдоль домов */
     ctx.strokeStyle = 'rgba(200,162,74,.45)';
@@ -1801,6 +1825,25 @@ button { font: inherit; color: inherit; }
   'use strict';
 
   var HARD = {
+    'roll.me': [
+      'Ну, поехали', 'Сойдёт', 'Могло быть и хуже', 'Так, что тут у нас',
+      'Нормально, работаем', 'Кости, не подведите', 'Пойдёт, не жалуюсь',
+      'Ага, вижу ход', 'Ну хоть что-то', 'Тактика, блядь, наше всё',
+      'Смотри и учись', 'Это я удачно зашёл', 'Кости сегодня вежливые',
+      'Ход есть, уже неплохо', 'Щас сообразим', 'Не густо, но сойдёт',
+      'Вот так и играем', 'Считаю, не мешай', 'Есть куда идти',
+      'Спокойно, всё под контролем', 'Ну такое. Ходим', 'Дай бог не последний'
+    ],
+    'roll.foe': [
+      'Ну и что ты этим хотел сказать?', 'Ходи уже', 'И это всё?',
+      'Не густо у тебя', 'Ага, давай-давай', 'Посмотрим, что придумаешь',
+      'Кости к тебе равнодушны', 'Так себе заход', 'Думай-думай',
+      'Я всё вижу', 'Ну ходи, чего замер', 'Это ты зря',
+      'Хм. Интересно', 'Опять ты со своими фокусами',
+      'Не то, на что рассчитывал, а?', 'Ладно, принимается',
+      'Спокойно, я подожду', 'Ход как ход', 'И далеко ты так уедешь?',
+      'Смотрю на тебя и не понимаю'
+    ],
     'six.foe': [
       'Заебал, иди нахуй',
       'Опять шеш-беш? Ты кости где брал, у напёрсточников?',
@@ -1933,6 +1976,14 @@ button { font: inherit; color: inherit; }
   };
 
   var SOFT = {
+    'roll.me': ['Ну, поехали', 'Сойдёт', 'Могло быть и хуже', 'Так, что тут у нас',
+                'Нормально, работаем', 'Кости, не подведите', 'Ага, вижу ход',
+                'Ну хоть что-то', 'Щас сообразим', 'Не густо, но сойдёт',
+                'Вот так и играем', 'Есть куда идти', 'Спокойно, всё под контролем'],
+    'roll.foe': ['И это всё?', 'Ходи уже', 'Не густо у тебя', 'Ага, давай-давай',
+                 'Посмотрим, что придумаешь', 'Так себе заход', 'Думай-думай',
+                 'Я всё вижу', 'Хм. Интересно', 'Ход как ход',
+                 'И далеко ты так уедешь?', 'Спокойно, я подожду'],
     'six.foe': ['Опять шесть-шесть? Ну знаете', 'Так нечестно', 'Кости к нему неровно дышат',
                 'Ещё один шеш-беш, и я обижусь'],
     'six.me': ['Шеш-беш! Вот это удача', 'Держите меня', 'Наконец-то', 'Шеш-беш. Не благодарите'],
@@ -1977,7 +2028,7 @@ button { font: inherit; color: inherit; }
 
   /* Насколько часто событие вообще заслуживает реплики */
   var CHANCE = {
-    six: 1, double: 0.32, worst: 0.4, stuck: 1, off: 0.2,
+    roll: 1, six: 1, double: 0.32, worst: 0.4, stuck: 1, off: 0.2,
     head: 1, home: 1, almost: 1, slow: 1, hint: 0.6, undo: 0.5,
     start: 0.5, win: 1, mars: 1
   };
@@ -2052,6 +2103,14 @@ button { font: inherit; color: inherit; }
     } catch (e) { return ''; }
   }
 
+  /* Фото профиля — если Telegram его отдал */
+  function photo() {
+    try {
+      var u = W && W.initDataUnsafe && W.initDataUnsafe.user;
+      return (u && u.photo_url) || '';
+    } catch (e) { return ''; }
+  }
+
   function startParam() {
     try {
       var p = W && W.initDataUnsafe && W.initDataUnsafe.start_param;
@@ -2097,6 +2156,7 @@ button { font: inherit; color: inherit; }
     bot: function () { return BOT; },
     ready: ready,
     userName: userName,
+    photo: photo,
     startParam: startParam,
     buzz: buzz,
     deepLink: deepLink,
@@ -2205,7 +2265,8 @@ button { font: inherit; color: inherit; }
             if (!seat) seat = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
             if (!seat) return { ok: false, why: 'full' };
             if (t.seats[seat] && t.seats[seat].id !== myId) return { ok: false, why: 'taken' };
-            t.seats[seat] = { id: myId, name: who || 'Игрок' };
+            who = who || {};
+            t.seats[seat] = { id: myId, name: who.name || 'Игрок', photo: who.photo || '' };
             t.updatedAt = Date.now();
             t.seq = (t.seq || 0) + 1;
             if (t.seats.w && t.seats.b) {
@@ -2306,7 +2367,8 @@ button { font: inherit; color: inherit; }
           if (!seat) seat = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
           if (!seat) return { ok: false, why: 'full' };
           if (t.seats[seat] && t.seats[seat].id !== myId) return { ok: false, why: 'taken' };
-          t.seats[seat] = { id: myId, name: who || 'Игрок' };
+          who = who || {};
+            t.seats[seat] = { id: myId, name: who.name || 'Игрок', photo: who.photo || '' };
           t.updatedAt = Date.now();
           t.seq = (t.seq || 0) + 1;
           t.code = code;
@@ -2870,7 +2932,7 @@ button { font: inherit; color: inherit; }
     q.textContent = text;
     q.classList.add('show');
     clearTimeout(quip._t);
-    quip._t = setTimeout(function () { q.classList.remove('show'); }, 3400);
+    quip._t = setTimeout(function () { q.classList.remove('show'); }, 2600);
   }
 
   function hushQuip() {
@@ -2888,10 +2950,6 @@ button { font: inherit; color: inherit; }
 
   function updateUI() {
     if (!S) return;
-    $('pip-w').textContent = N.pips(S, 'w');
-    $('pip-b').textContent = N.pips(S, 'b');
-    $('off-w').textContent = S.off.w;
-    $('off-b').textContent = S.off.b;
     $('tally-w').textContent = tally.w;
     $('tally-b').textContent = tally.b;
     var chip = $('net-chip');
@@ -2911,13 +2969,37 @@ button { font: inherit; color: inherit; }
     $('act-undo').disabled = !(my && undoStack.length);
     $('act-hint').disabled = !(my && legal.length);
     setSides();
+    setAvatars();
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
     $('act-sound').textContent = opts.sound ? '♪' : '✕';
     $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
   }
 
+  /* Аватарка: фото из Telegram у людей, резная шашка у компьютера */
+  function setAvatars() {
+    ['w', 'b'].forEach(function (p) {
+      var box = $('ava-' + p);
+      if (!box) return;
+      var url = '';
+      if (isNet()) {
+        var seat = net.table && net.table.seats ? net.table.seats[p] : null;
+        url = seat && seat.photo ? seat.photo : '';
+      } else if (!isAI(p) && (opts.mode !== 'ai' || p === opts.human)) {
+        url = NardyTG.photo();
+      }
+      if (box.dataset.url === url) return;
+      box.dataset.url = url;
+      box.innerHTML = url
+        ? '<img alt="" src="' + esc(url) + '" onerror="this.remove()">'
+        : '<span class="disc ' + p + '"></span>';
+      var d = box.querySelector('.disc');
+      if (d) d.style.backgroundImage = 'url(' + B.checker(p, 96) + ')';
+    });
+  }
+
   function renderLog() {
     var ol = $('log');
+    if (!ol) return;                 /* журнал убран с экрана */
     ol.innerHTML = '';
     rows.slice(-40).forEach(function (r) {
       var li = document.createElement('li');
@@ -3038,23 +3120,20 @@ button { font: inherit; color: inherit; }
     else { busy = false; markLive(); updateUI(); }
   }
 
-  /* Кто-то за столом обязательно прокомментирует бросок */
+  /* На каждый бросок — своя реплика. Редкое событие важнее обычного броска */
   function banter(d1, d2) {
-    var p = S.turn;
-    if (!S.turnNo.w && !S.turnNo.b) quip('start', p);
-    if (d1 === d2) quip(d1 === 6 ? 'six' : 'double', p, d1 === 6);
-    else if (d1 + d2 === 3) quip('worst', p);
-
-    if (!bf['home' + p] && N.allHome(S, p) && S.off[p] < 12) {
-      bf['home' + p] = true; quip('home', p);
-    } else if (!bf['almost' + p] && S.off[p] >= 12) {
-      bf['almost' + p] = true; quip('almost', p);
-    } else if (!bf.slow && S.turnNo.w + S.turnNo.b >= 90) {
-      bf.slow = true; quip('slow', p);
-    } else if (!bf.head && S.turnNo[p] >= 8 && N.cnt(S, N.HEAD[p], p) >= 10 &&
-               sideOf(p) === 'me') {
-      bf.head = true; quip('head', p);
-    }
+    var p = S.turn, ev;
+    if (!S.turnNo.w && !S.turnNo.b) ev = 'start';
+    else if (!bf['home' + p] && N.allHome(S, p) && S.off[p] < 12) { bf['home' + p] = 1; ev = 'home'; }
+    else if (!bf['almost' + p] && S.off[p] >= 12) { bf['almost' + p] = 1; ev = 'almost'; }
+    else if (d1 === d2 && d1 === 6) ev = 'six';
+    else if (d1 === d2) ev = 'double';
+    else if (d1 + d2 === 3) ev = 'worst';
+    else if (!bf.slow && S.turnNo.w + S.turnNo.b >= 90) { bf.slow = 1; ev = 'slow'; }
+    else if (!bf.head && S.turnNo[p] >= 8 && N.cnt(S, N.HEAD[p], p) >= 10 &&
+             sideOf(p) === 'me') { bf.head = 1; ev = 'head'; }
+    else ev = 'roll';
+    quip(ev, p, true);
   }
 
   function aiTurn() {
@@ -3367,7 +3446,7 @@ button { font: inherit; color: inherit; }
   function createTable() {
     var seat = opts.human === 'b' ? 'b' : 'w';
     var seats = { w: null, b: null };
-    seats[seat] = { id: NardyNet.id(), name: NardyNet.name() || 'Игрок' };
+    seats[seat] = { id: NardyNet.id(), name: NardyNet.name() || 'Игрок', photo: NardyTG.photo() };
     var fresh = N.create();
     net.seat = seat;
     net.table = null;
@@ -3389,7 +3468,7 @@ button { font: inherit; color: inherit; }
   function sitDown(code) {
     code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 4 || code.length > 8) { toast('Код стола — шесть знаков'); return; }
-    NardyNet.sit(code, null, NardyNet.name() || 'Игрок', function (t) {
+    NardyNet.sit(code, null, { name: NardyNet.name() || 'Игрок', photo: NardyTG.photo() }, function (t) {
       var st = t.state;
       if (!t.toss && !st.roll.length && !st.turnNo.w && !st.turnNo.b) {
         var x = toss();

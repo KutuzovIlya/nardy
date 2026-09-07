@@ -434,7 +434,7 @@
     q.textContent = text;
     q.classList.add('show');
     clearTimeout(quip._t);
-    quip._t = setTimeout(function () { q.classList.remove('show'); }, 3400);
+    quip._t = setTimeout(function () { q.classList.remove('show'); }, 2600);
   }
 
   function hushQuip() {
@@ -452,10 +452,6 @@
 
   function updateUI() {
     if (!S) return;
-    $('pip-w').textContent = N.pips(S, 'w');
-    $('pip-b').textContent = N.pips(S, 'b');
-    $('off-w').textContent = S.off.w;
-    $('off-b').textContent = S.off.b;
     $('tally-w').textContent = tally.w;
     $('tally-b').textContent = tally.b;
     var chip = $('net-chip');
@@ -475,13 +471,37 @@
     $('act-undo').disabled = !(my && undoStack.length);
     $('act-hint').disabled = !(my && legal.length);
     setSides();
+    setAvatars();
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
     $('act-sound').textContent = opts.sound ? '♪' : '✕';
     $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
   }
 
+  /* Аватарка: фото из Telegram у людей, резная шашка у компьютера */
+  function setAvatars() {
+    ['w', 'b'].forEach(function (p) {
+      var box = $('ava-' + p);
+      if (!box) return;
+      var url = '';
+      if (isNet()) {
+        var seat = net.table && net.table.seats ? net.table.seats[p] : null;
+        url = seat && seat.photo ? seat.photo : '';
+      } else if (!isAI(p) && (opts.mode !== 'ai' || p === opts.human)) {
+        url = NardyTG.photo();
+      }
+      if (box.dataset.url === url) return;
+      box.dataset.url = url;
+      box.innerHTML = url
+        ? '<img alt="" src="' + esc(url) + '" onerror="this.remove()">'
+        : '<span class="disc ' + p + '"></span>';
+      var d = box.querySelector('.disc');
+      if (d) d.style.backgroundImage = 'url(' + B.checker(p, 96) + ')';
+    });
+  }
+
   function renderLog() {
     var ol = $('log');
+    if (!ol) return;                 /* журнал убран с экрана */
     ol.innerHTML = '';
     rows.slice(-40).forEach(function (r) {
       var li = document.createElement('li');
@@ -602,23 +622,20 @@
     else { busy = false; markLive(); updateUI(); }
   }
 
-  /* Кто-то за столом обязательно прокомментирует бросок */
+  /* На каждый бросок — своя реплика. Редкое событие важнее обычного броска */
   function banter(d1, d2) {
-    var p = S.turn;
-    if (!S.turnNo.w && !S.turnNo.b) quip('start', p);
-    if (d1 === d2) quip(d1 === 6 ? 'six' : 'double', p, d1 === 6);
-    else if (d1 + d2 === 3) quip('worst', p);
-
-    if (!bf['home' + p] && N.allHome(S, p) && S.off[p] < 12) {
-      bf['home' + p] = true; quip('home', p);
-    } else if (!bf['almost' + p] && S.off[p] >= 12) {
-      bf['almost' + p] = true; quip('almost', p);
-    } else if (!bf.slow && S.turnNo.w + S.turnNo.b >= 90) {
-      bf.slow = true; quip('slow', p);
-    } else if (!bf.head && S.turnNo[p] >= 8 && N.cnt(S, N.HEAD[p], p) >= 10 &&
-               sideOf(p) === 'me') {
-      bf.head = true; quip('head', p);
-    }
+    var p = S.turn, ev;
+    if (!S.turnNo.w && !S.turnNo.b) ev = 'start';
+    else if (!bf['home' + p] && N.allHome(S, p) && S.off[p] < 12) { bf['home' + p] = 1; ev = 'home'; }
+    else if (!bf['almost' + p] && S.off[p] >= 12) { bf['almost' + p] = 1; ev = 'almost'; }
+    else if (d1 === d2 && d1 === 6) ev = 'six';
+    else if (d1 === d2) ev = 'double';
+    else if (d1 + d2 === 3) ev = 'worst';
+    else if (!bf.slow && S.turnNo.w + S.turnNo.b >= 90) { bf.slow = 1; ev = 'slow'; }
+    else if (!bf.head && S.turnNo[p] >= 8 && N.cnt(S, N.HEAD[p], p) >= 10 &&
+             sideOf(p) === 'me') { bf.head = 1; ev = 'head'; }
+    else ev = 'roll';
+    quip(ev, p, true);
   }
 
   function aiTurn() {
@@ -931,7 +948,7 @@
   function createTable() {
     var seat = opts.human === 'b' ? 'b' : 'w';
     var seats = { w: null, b: null };
-    seats[seat] = { id: NardyNet.id(), name: NardyNet.name() || 'Игрок' };
+    seats[seat] = { id: NardyNet.id(), name: NardyNet.name() || 'Игрок', photo: NardyTG.photo() };
     var fresh = N.create();
     net.seat = seat;
     net.table = null;
@@ -953,7 +970,7 @@
   function sitDown(code) {
     code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 4 || code.length > 8) { toast('Код стола — шесть знаков'); return; }
-    NardyNet.sit(code, null, NardyNet.name() || 'Игрок', function (t) {
+    NardyNet.sit(code, null, { name: NardyNet.name() || 'Игрок', photo: NardyTG.photo() }, function (t) {
       var st = t.state;
       if (!t.toss && !st.roll.length && !st.turnNo.w && !st.turnNo.b) {
         var x = toss();

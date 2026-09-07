@@ -51,6 +51,14 @@
     } catch (e) { return ''; }
   }
 
+  /* Фото профиля — если Telegram его отдал */
+  function photo() {
+    try {
+      var u = W && W.initDataUnsafe && W.initDataUnsafe.user;
+      return (u && u.photo_url) || '';
+    } catch (e) { return ''; }
+  }
+
   function startParam() {
     try {
       var p = W && W.initDataUnsafe && W.initDataUnsafe.start_param;
@@ -96,6 +104,7 @@
     bot: function () { return BOT; },
     ready: ready,
     userName: userName,
+    photo: photo,
     startParam: startParam,
     buzz: buzz,
     deepLink: deepLink,

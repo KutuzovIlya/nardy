@@ -96,7 +96,8 @@
             if (!seat) seat = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
             if (!seat) return { ok: false, why: 'full' };
             if (t.seats[seat] && t.seats[seat].id !== myId) return { ok: false, why: 'taken' };
-            t.seats[seat] = { id: myId, name: who || 'Игрок' };
+            who = who || {};
+            t.seats[seat] = { id: myId, name: who.name || 'Игрок', photo: who.photo || '' };
             t.updatedAt = Date.now();
             t.seq = (t.seq || 0) + 1;
             if (t.seats.w && t.seats.b) {
@@ -197,7 +198,8 @@
           if (!seat) seat = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
           if (!seat) return { ok: false, why: 'full' };
           if (t.seats[seat] && t.seats[seat].id !== myId) return { ok: false, why: 'taken' };
-          t.seats[seat] = { id: myId, name: who || 'Игрок' };
+          who = who || {};
+            t.seats[seat] = { id: myId, name: who.name || 'Игрок', photo: who.photo || '' };
           t.updatedAt = Date.now();
           t.seq = (t.seq || 0) + 1;
           t.code = code;

@@ -150,14 +150,14 @@
     ctx.save();
     ctx.lineCap = 'round';
     ctx.translate(0, -depth);
-    ctx.strokeStyle = 'rgba(255,226,180,' + (light || 0.30) + ')';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(255,232,192,' + (light || 0.30) + ')';
+    ctx.lineWidth = 1.8;
     path(ctx);
     ctx.restore();
     ctx.save();
     ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(20,9,3,.55)';
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = 'rgba(16,7,2,.75)';
+    ctx.lineWidth = 2.6;
     path(ctx);
     ctx.restore();
   }
@@ -201,6 +201,65 @@
     g.addColorStop(1, 'rgba(24,11,4,.45)');
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.28, 0, 6.284);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* Восьмиконечная воровская звезда — главный знак на таких досках */
+  function thiefStar(ctx, cx, cy, r) {
+    var i, a;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    /* два квадрата, повёрнутые друг относительно друга */
+    [0, Math.PI / 4].forEach(function (turn) {
+      cut(ctx, function (c) {
+        c.beginPath();
+        for (i = 0; i < 4; i++) {
+          a = turn + i * Math.PI / 2;
+          var x = Math.cos(a) * r, y = Math.sin(a) * r;
+          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        }
+        c.closePath();
+        c.stroke();
+      }, 1, 0.30);
+    });
+
+    /* лучи от центра к вершинам */
+    cut(ctx, function (c) {
+      c.beginPath();
+      for (i = 0; i < 8; i++) {
+        a = i * Math.PI / 4;
+        c.moveTo(Math.cos(a) * r * 0.20, Math.sin(a) * r * 0.20);
+        c.lineTo(Math.cos(a) * r * 0.97, Math.sin(a) * r * 0.97);
+      }
+      c.stroke();
+    }, 1, 0.22);
+
+    /* грани лучей — чтобы звезда читалась объёмной */
+    ctx.save();
+    for (i = 0; i < 8; i++) {
+      a = i * Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.97, Math.sin(a) * r * 0.97);
+      ctx.lineTo(Math.cos(a + Math.PI / 8) * r * 0.42, Math.sin(a + Math.PI / 8) * r * 0.42);
+      ctx.lineTo(Math.cos(a - Math.PI / 8) * r * 0.42, Math.sin(a - Math.PI / 8) * r * 0.42);
+      ctx.closePath();
+      ctx.fillStyle = i % 2 ? 'rgba(255,230,190,.13)' : 'rgba(18,8,2,.34)';
+      ctx.fill();
+    }
+    ctx.restore();
+
+    [r * 0.20, r * 0.42].forEach(function (rr) {
+      cut(ctx, function (c) { c.beginPath(); c.arc(0, 0, rr, 0, 6.284); c.stroke(); }, 1, 0.24);
+    });
+
+    var g = ctx.createRadialGradient(-r * 0.08, -r * 0.08, 1, 0, 0, r * 0.20);
+    g.addColorStop(0, 'rgba(255,224,170,.22)');
+    g.addColorStop(1, 'rgba(24,11,4,.5)');
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.19, 0, 6.284);
     ctx.fillStyle = g;
     ctx.fill();
     ctx.restore();
@@ -253,7 +312,7 @@
     ctx.restore();
 
     [[c + 1, c + 1], [VW - c - 1, c + 1], [c + 1, VH - c - 1], [VW - c - 1, VH - c - 1]]
-      .forEach(function (p) { rosette(ctx, p[0], p[1], 9, 8); });
+      .forEach(function (p) { thiefStar(ctx, p[0], p[1], 8); });
 
     ctx.strokeStyle = 'rgba(200,162,74,.42)';
     ctx.lineWidth = 1.1;
@@ -295,7 +354,7 @@
     ctx.strokeStyle = 'rgba(200,162,74,.28)';
     ctx.lineWidth = 1;
     rrect(ctx, b.x, b.y, b.w, b.h, 8); ctx.stroke();
-    label(ctx, player === 'w' ? b.x + 40 : b.x + b.w - 40, b.y + b.h / 2, 'ДОМ');
+    thiefStar(ctx, b.x + b.w / 2, b.y + b.h / 2, 26);
   }
 
   /* Надпись стоит ровно, даже если доска развёрнута на 180° */
@@ -358,9 +417,9 @@
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    /* резные солнца в поле между рядами */
-    rosette(ctx, colX(3) + COL / 2, TOPY + PTH + MID / 2, 34, 12);
-    rosette(ctx, colX(9) + COL / 2, TOPY + PTH + MID / 2, 34, 12);
+    /* воровские звёзды в поле между рядами */
+    thiefStar(ctx, (colX(0) + colX(5) + COL) / 2, TOPY + PTH + MID / 2, 52);
+    thiefStar(ctx, (colX(6) + colX(11) + COL) / 2, TOPY + PTH + MID / 2, 52);
 
     /* латунная нить вдоль домов */
     ctx.strokeStyle = 'rgba(200,162,74,.45)';
