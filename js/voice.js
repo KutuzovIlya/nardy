@@ -31,7 +31,10 @@
   /* Переписываем под южный говор: «нэ», «ти», «толко», «шо» */
   function accent(text) {
     var out = '', i, ch, prev;
-    text = text.replace(/\bчто\b/g, 'шо').replace(/\bЧто\b/g, 'Шо');
+    /* \b в JS не знает кириллицы, поэтому границу слова ищем вручную */
+    text = text.replace(/(^|[^а-яёА-ЯЁ])([Чч])то(?![а-яёА-ЯЁ])/g, function (m, pre, c) {
+      return pre + (c === 'Ч' ? 'Шо' : 'шо');
+    });
     for (i = 0; i < text.length; i++) {
       ch = text[i];
       prev = (out[out.length - 1] || '').toLowerCase();
