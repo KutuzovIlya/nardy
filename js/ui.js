@@ -8,7 +8,7 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var board = $('board'), scene = $('scene'), stage = $('stage');
-  var lZones = $('zones'), lMen = $('men'), lSpots = $('spots'), lDice = $('dice');
+  var lZones = $('zones'), lMen = $('men'), lSpots = $('spots'), lDice = $('dicefx');
 
   var S = null;              /* состояние партии */
   var VIS = null;            /* какие шашки где лежат: { pts: [..], off: {} } */
@@ -169,6 +169,7 @@
         [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.5, 0.07, i * 0.11, 'triangle'); });
       }
       else if (kind === 'no') { tone(150, 0.16, 0.06, 0, 'sawtooth'); }
+      else if (kind === 'tick') { noise(0.035, 1900, 1.4, 0.10); }
     } catch (e) {}
   }
 
@@ -281,7 +282,6 @@
     if (!k) return;
     lMen.style.setProperty('--cd', (B.CD * k) + 'px');
     lSpots.style.setProperty('--cd', (B.CD * k) + 'px');
-    lDice.style.setProperty('--dd', (B.DD * k) + 'px');
 
     if (instant) {
       lMen.style.transition = 'none';
@@ -343,44 +343,44 @@
 
   /* ---------- кости ---------- */
 
-  /* Кость лежит в обёртке: обёртка задаёт место, анимация крутит саму кость */
-  function dieEl(value, dark, used, x, y, delay) {
-    var wrap = document.createElement('div');
-    wrap.className = 'die-wrap';
-    wrap.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
-    var d = document.createElement('div');
-    d.className = 'die' + (used ? ' used' : '');
-    d.style.backgroundImage = 'url(' + B.die(dark ? 'b' : 'w', value, 132) + ')';
-    if (delay !== null) {
-      d.style.animationDelay = delay + 'ms';
-      d.classList.add('tumble');
-    }
-    wrap.appendChild(d);
-    return wrap;
-  }
+  var diceKey = '';
+  var lastTick = 0;
 
+  /* Кости живут на своём холсте: бросок считается физикой */
   function renderDice(animate) {
-    lDice.innerHTML = '';
-    if (!S || !S.roll.length) return;
-    var k = scale();
-    var vals = S.roll[0] === S.roll[1] ? [S.roll[0], S.roll[0], S.roll[0], S.roll[0]] : S.roll.slice();
-    var left = S.dice.slice();
-    vals.forEach(function (v, idx) {
-      var used = true, at = left.indexOf(v);
-      if (at >= 0) { used = false; left.splice(at, 1); }
-      var d = B.diceAt(S.turn, idx, vals.length), q = px(d.x, d.y, B.DD, k);
-      lDice.appendChild(dieEl(v, S.turn === 'b', used, q.x, q.y, animate ? idx * 45 : null));
+    if (!S || !S.roll.length) { diceKey = ''; NardyDice.clear(); return; }
+    var vals = S.roll[0] === S.roll[1]
+      ? [S.roll[0], S.roll[0], S.roll[0], S.roll[0]]
+      : S.roll.slice();
+    var left = S.dice.slice(), used = [];
+    vals.forEach(function (v) {
+      var at = left.indexOf(v);
+      if (at >= 0) { left.splice(at, 1); used.push(false); } else used.push(true);
     });
+    var key = S.turn + ':' + S.roll.join(',') + ':' + S.turnNo.w + ':' + S.turnNo.b;
+    if (animate) {
+      diceKey = key;
+      NardyDice.roll(S.turn, vals, diceTick, function () { renderDice(false); });
+      return;
+    }
+    if (NardyDice.rolling()) return;
+    if (key !== diceKey) { diceKey = key; NardyDice.place(S.turn, vals); }
+    NardyDice.show(used);
   }
 
-  /* костяшки при жеребьёвке — по одной каждому */
+  /* стук кости о доску — но не чаще, чем ухо разбирает.
+     Имя не tick: так называется счётчик отложенных действий. */
+  function diceTick() {
+    var now = Date.now();
+    if (now - lastTick < 55) return;
+    lastTick = now;
+    sfx('tick');
+  }
+
+  /* жеребьёвка: по кости каждому, летят с обеих сторон */
   function renderOpeningDice(a, b) {
-    lDice.innerHTML = '';
-    var k = scale();
-    [['w', a], ['b', b]].forEach(function (pair) {
-      var d = B.diceAt(pair[0], 0, 1), q = px(d.x, d.y, B.DD, k);
-      lDice.appendChild(dieEl(pair[1], pair[0] === 'b', false, q.x, q.y, 0));
-    });
+    diceKey = 'toss';
+    NardyDice.roll('w', [a, b], diceTick, null, { sides: ['w', 'b'], wide: true });
   }
 
   /* ---------- метки возможных ходов ---------- */
@@ -1381,6 +1381,7 @@
   function onResize() {
     fit();
     B.render(scene);
+    NardyDice.resize();
     if (VIS) place(true);
   }
   function bumpResize() {
@@ -1410,6 +1411,7 @@
   fit();
   buildZones();
   B.render(scene);
+  NardyDice.attach($('dicefx'));
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { B.render(scene); });
   }
