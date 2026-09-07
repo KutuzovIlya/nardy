@@ -336,9 +336,8 @@
       });
     }
     for (var i = 0; i < 24; i++) lZones.children[i].classList.toggle('live', !!live[i]);
-    var off = !!live.off && sel !== null && destFor(sel).some(function (m) { return m.to === N.OFF; });
-    lZones.children[24].classList.toggle('live', off && S.turn === 'w');
-    lZones.children[25].classList.toggle('live', off && S.turn === 'b');
+    lZones.children[24].classList.remove('live');
+    lZones.children[25].classList.remove('live');
   }
 
   /* ---------- кости ---------- */
@@ -385,33 +384,17 @@
 
   /* ---------- метки возможных ходов ---------- */
 
+  /* Куда дойдёт выбранная шашка: {пункт: цепочка ходов}.
+     При 6-4 сюда попадают и +6, и +4, и +10 одним махом. */
+  var reach = {};
+
   function destFor(i) {
     return legal.filter(function (m) { return m.from === i; });
   }
 
+  /* Ходы не подсвечиваем — игроки опытные, сами видят */
   function renderSpots() {
-    lSpots.innerHTML = '';
-    if (sel === null || busy) return;
-    var k = scale(), seen = {};
-    destFor(sel).forEach(function (m) {
-      if (seen[m.to] !== undefined) return;
-      seen[m.to] = m.die;
-      var q, n;
-      if (m.to === N.OFF) {
-        q = B.trayAt(S.turn, VIS.off[S.turn].length);
-      } else {
-        n = VIS.pts[m.to].length + 1;
-        q = B.manAt(m.to, n - 1, n);
-      }
-      q = px(q.x, q.y, B.CD, k);
-      var s = document.createElement('div');
-      s.className = 'spot';
-      s.dataset.to = m.to;
-      s.dataset.die = m.die;
-      s.innerHTML = '<em>' + m.die + '</em>';
-      s.style.transform = 'translate3d(' + q.x.toFixed(1) + 'px,' + q.y.toFixed(1) + 'px,0)';
-      lSpots.appendChild(s);
-    });
+    if (lSpots.firstChild) lSpots.innerHTML = '';
   }
 
   /* ---------- панели ---------- */
@@ -647,16 +630,17 @@
 
   function pick(i) {
     sel = i;
+    reach = N.chains(S, i);
     place(false);
-    renderSpots();
     markLive();
   }
 
   function clearSel() {
     if (sel === null) return;
     sel = null;
+    reach = {};
     place(false);
-    renderSpots();
+    markLive();
   }
 
   function clearHint() {
@@ -664,15 +648,20 @@
     hinted = null;
   }
 
-  function tryMoveTo(to, die) {
-    var ms = destFor(sel).filter(function (m) { return m.to === to; });
-    if (!ms.length) return false;
-    var mv = ms[0];
-    if (die) { ms.forEach(function (m) { if (m.die === die) mv = m; }); }
+  function tryMoveTo(to) {
+    var path = reach[to];
+    if (!path || !path.length) return false;
     busy = true;
-    doMove(mv);
-    later(260, afterMove);
+    reach = {};
+    playChain(path, 0);
     return true;
+  }
+
+  /* Составной ход показываем по шагам — видно, каким путём шашка идёт */
+  function playChain(path, i) {
+    doMove(path[i]);
+    if (i + 1 < path.length) later(230, function () { playChain(path, i + 1); });
+    else later(260, afterMove);
   }
 
   function canPick(i) {
@@ -695,9 +684,12 @@
       return;
     }
     var i = +z.dataset.i;
-    if (sel !== null && sel !== i && tryMoveTo(i)) return;
+    if (sel !== null && sel !== i) {
+      if (tryMoveTo(i)) return;
+      if (N.cnt(S, i, S.turn) === 0) { sfx('no'); clearSel(); return; }
+    }
     if (!canPick(i)) {
-      if (N.cnt(S, i, S.turn) > 0) toast('Этой шашкой сейчас не сходить');
+      sfx('no');
       clearSel();
       return;
     }
@@ -738,8 +730,7 @@
     var spot = under && under.closest ? under.closest('.spot') : null;
     var zone = under && under.closest ? under.closest('.zone') : null;
     var ok = false;
-    if (spot) ok = tryMoveTo(+spot.dataset.to, +spot.dataset.die);
-    else if (zone && zone.dataset.tray === S.turn) ok = tryMoveTo(N.OFF);
+    if (zone && zone.dataset.tray === S.turn) ok = tryMoveTo(N.OFF);
     else if (zone && !zone.dataset.tray) ok = tryMoveTo(+zone.dataset.i);
     if (!ok) place(false);
   }
@@ -1395,7 +1386,10 @@
   /* ---------- старт ---------- */
 
   window.NardyDebug = function () {
-    return { mode: opts.mode, code: net.code, seat: net.seat, ready: net.ready,
+    return {
+      roll: S ? S.roll.slice() : null,
+      reach: Object.keys(reach).map(Number),
+      sel: sel, mode: opts.mode, code: net.code, seat: net.seat, ready: net.ready,
              hasTable: !!net.table, hasS: !!S, busy: busy, legal: legal.length,
              isNet: isNet(), status: net.table && net.table.status };
   };

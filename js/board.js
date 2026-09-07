@@ -594,62 +594,91 @@
     6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]]
   };
 
-  /* Костяной кубик: точка в кольце — как на старых игральных костях */
+  /* Гранитный кубик: синий камень с крапом, прожилками и полировкой.
+     Точки высверлены — тёмная лунка со светлым краем, где ловит свет. */
   function die(side, value, px) {
     var key = 'die' + side + value + px;
     if (cache[key]) return cache[key];
     cache[key] = face(px, function (ctx, s) {
-      var bone = side === 'w', i, gr = rnd32(value * 7 + (bone ? 1 : 2));
+      var pale = side === 'w', i, gr = rnd32(value * 13 + (pale ? 3 : 7));
       ctx.save();
-      rrect(ctx, 1, 1, s - 2, s - 2, s * 0.2);
+      rrect(ctx, 1, 1, s - 2, s - 2, s * 0.17);
       ctx.clip();
-      var g = ctx.createLinearGradient(0, 0, s * 0.9, s);
-      if (bone) {
-        g.addColorStop(0, '#FFFAEC'); g.addColorStop(0.5, '#EFE0BD'); g.addColorStop(1, '#C9B183');
+
+      var g = ctx.createLinearGradient(0, 0, s * 0.85, s);
+      if (pale) {
+        g.addColorStop(0, '#7C93AE'); g.addColorStop(0.45, '#5A7391'); g.addColorStop(1, '#33475F');
       } else {
-        g.addColorStop(0, '#4E4437'); g.addColorStop(0.5, '#2C2419'); g.addColorStop(1, '#120D08');
+        g.addColorStop(0, '#42597A'); g.addColorStop(0.45, '#2B3E58'); g.addColorStop(1, '#151F2E');
       }
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, s, s);
 
-      ctx.globalAlpha = bone ? 0.18 : 0.22;
-      for (i = 0; i < 26; i++) {
+      /* крап: гранит держится на нём */
+      for (i = 0; i < Math.round(s * 6); i++) {
+        var x = gr() * s, y = gr() * s, r = s * (0.004 + gr() * 0.016);
+        var t = gr();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 6.284);
+        ctx.fillStyle = t > 0.72 ? 'rgba(226,236,248,' + (0.20 + gr() * 0.5).toFixed(2) + ')'
+          : t > 0.42 ? 'rgba(10,16,26,' + (0.18 + gr() * 0.45).toFixed(2) + ')'
+          : 'rgba(150,172,198,' + (0.10 + gr() * 0.28).toFixed(2) + ')';
+        ctx.fill();
+      }
+
+      /* прожилки */
+      for (i = 0; i < 5; i++) {
         ctx.beginPath();
         var y0 = gr() * s;
-        ctx.moveTo(0, y0);
-        ctx.bezierCurveTo(s * 0.3, y0 + (gr() - 0.5) * 8, s * 0.7, y0 + (gr() - 0.5) * 8, s, y0 + (gr() - 0.5) * 6);
-        ctx.strokeStyle = gr() > 0.5 ? 'rgba(255,244,220,.6)' : 'rgba(40,25,8,.6)';
-        ctx.lineWidth = 0.4 + gr();
+        ctx.moveTo(-2, y0);
+        ctx.bezierCurveTo(s * 0.3, y0 + (gr() - 0.5) * s * 0.3,
+                          s * 0.7, y0 + (gr() - 0.5) * s * 0.3, s + 2, y0 + (gr() - 0.5) * s * 0.2);
+        ctx.strokeStyle = gr() > 0.5 ? 'rgba(206,222,240,.13)' : 'rgba(8,14,22,.20)';
+        ctx.lineWidth = 0.6 + gr() * 1.6;
         ctx.stroke();
       }
-      ctx.globalAlpha = 1;
 
       PIPS[value].forEach(function (p) {
-        var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.085;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr * 1.9, 0, 6.284);
-        ctx.strokeStyle = bone ? 'rgba(70,48,18,.38)' : 'rgba(226,206,160,.34)';
-        ctx.lineWidth = s * 0.016;
-        ctx.stroke();
-        var pg = ctx.createRadialGradient(cx - rr * 0.3, cy - rr * 0.35, rr * 0.1, cx, cy, rr);
-        if (bone) { pg.addColorStop(0, '#6A5537'); pg.addColorStop(1, '#241A0D'); }
-        else { pg.addColorStop(0, '#F6EAC8'); pg.addColorStop(1, '#B39A63'); }
+        var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.088;
+        /* лунка */
+        var pg = ctx.createRadialGradient(cx + rr * 0.32, cy + rr * 0.36, rr * 0.06, cx, cy, rr);
+        pg.addColorStop(0, pale ? '#1B2836' : '#0A121C');
+        pg.addColorStop(0.72, pale ? '#101A25' : '#060B12');
+        pg.addColorStop(1, pale ? '#2C4058' : '#16212F');
         ctx.beginPath();
         ctx.arc(cx, cy, rr, 0, 6.284);
         ctx.fillStyle = pg;
         ctx.fill();
+        /* светлый край сверху-слева — свет на кромке отверстия */
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr * 0.98, Math.PI * 0.9, Math.PI * 1.9);
+        ctx.strokeStyle = 'rgba(216,232,250,.42)';
+        ctx.lineWidth = s * 0.014;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr * 0.98, Math.PI * 1.9, Math.PI * 2.9);
+        ctx.strokeStyle = 'rgba(6,10,16,.4)';
+        ctx.lineWidth = s * 0.012;
+        ctx.stroke();
       });
 
-      var hi = ctx.createLinearGradient(0, 0, s * 0.5, s * 0.6);
-      hi.addColorStop(0, bone ? 'rgba(255,255,248,.55)' : 'rgba(255,240,210,.14)');
-      hi.addColorStop(0.6, 'rgba(255,255,255,0)');
+      /* полировка */
+      var hi = ctx.createLinearGradient(0, 0, s * 0.55, s * 0.65);
+      hi.addColorStop(0, 'rgba(233,243,255,' + (pale ? 0.40 : 0.24) + ')');
+      hi.addColorStop(0.55, 'rgba(233,243,255,0)');
       ctx.fillStyle = hi;
       ctx.fillRect(0, 0, s, s);
-      var sh = ctx.createLinearGradient(s * 0.4, s * 0.5, s, s);
+      var sh = ctx.createLinearGradient(s * 0.35, s * 0.45, s, s);
       sh.addColorStop(0, 'rgba(0,0,0,0)');
-      sh.addColorStop(1, bone ? 'rgba(70,48,16,.34)' : 'rgba(0,0,0,.5)');
+      sh.addColorStop(1, 'rgba(2,6,12,.5)');
       ctx.fillStyle = sh;
       ctx.fillRect(0, 0, s, s);
+
+      /* скол кромки */
+      ctx.strokeStyle = 'rgba(222,236,252,.22)';
+      ctx.lineWidth = s * 0.012;
+      rrect(ctx, 2, 2, s - 4, s - 4, s * 0.16);
+      ctx.stroke();
       ctx.restore();
     });
     return cache[key];

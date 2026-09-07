@@ -1003,6 +1003,33 @@ button { font: inherit; color: inherit; }
     return out;
   }
 
+  /* Куда может дойти одна шашка за весь ход, включая сумму костей:
+     при 6-4 это и +6, и +4, и +10. Каждый шаг обязан быть законным
+     сам по себе — перепрыгнуть занятый пункт нельзя. */
+  function chains(st, from) {
+    var out = {}, memo = {}, seen = {};
+
+    function walk(s, at, path) {
+      if (path.length > 4) return;
+      var key = s.points.join(',') + '|' + at + '|' + s.dice.slice().sort().join('');
+      if (seen[key]) return;
+      seen[key] = 1;
+      var mv = legalMoves(s, memo), i, m, ns, p;
+      for (i = 0; i < mv.length; i++) {
+        m = mv[i];
+        if (m.from !== at) continue;
+        ns = clone(s);
+        applyTo(ns, m);
+        p = path.concat([m]);
+        if (!out[m.to] || out[m.to].length > p.length) out[m.to] = p;
+        if (m.to !== OFF) walk(ns, m.to, p);
+      }
+    }
+
+    walk(clone(st), from, []);
+    return out;
+  }
+
   function rollDie() { return 1 + Math.floor(Math.random() * 6); }
 
   global.Nardy = {
@@ -1011,7 +1038,7 @@ button { font: inherit; color: inherit; }
     create: create, clone: clone, setRoll: setRoll, endTurn: endTurn,
     headLimit: headLimit, allHome: allHome, pips: pips, blockLegal: blockLegal,
     applyTo: applyTo, rawMoves: rawMoves, legalMoves: legalMoves,
-    maxDepth: maxDepth, sequences: sequences, rollDie: rollDie
+    maxDepth: maxDepth, sequences: sequences, chains: chains, rollDie: rollDie
   };
 })(window);
 </script>
@@ -1749,62 +1776,91 @@ button { font: inherit; color: inherit; }
     6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]]
   };
 
-  /* Костяной кубик: точка в кольце — как на старых игральных костях */
+  /* Гранитный кубик: синий камень с крапом, прожилками и полировкой.
+     Точки высверлены — тёмная лунка со светлым краем, где ловит свет. */
   function die(side, value, px) {
     var key = 'die' + side + value + px;
     if (cache[key]) return cache[key];
     cache[key] = face(px, function (ctx, s) {
-      var bone = side === 'w', i, gr = rnd32(value * 7 + (bone ? 1 : 2));
+      var pale = side === 'w', i, gr = rnd32(value * 13 + (pale ? 3 : 7));
       ctx.save();
-      rrect(ctx, 1, 1, s - 2, s - 2, s * 0.2);
+      rrect(ctx, 1, 1, s - 2, s - 2, s * 0.17);
       ctx.clip();
-      var g = ctx.createLinearGradient(0, 0, s * 0.9, s);
-      if (bone) {
-        g.addColorStop(0, '#FFFAEC'); g.addColorStop(0.5, '#EFE0BD'); g.addColorStop(1, '#C9B183');
+
+      var g = ctx.createLinearGradient(0, 0, s * 0.85, s);
+      if (pale) {
+        g.addColorStop(0, '#7C93AE'); g.addColorStop(0.45, '#5A7391'); g.addColorStop(1, '#33475F');
       } else {
-        g.addColorStop(0, '#4E4437'); g.addColorStop(0.5, '#2C2419'); g.addColorStop(1, '#120D08');
+        g.addColorStop(0, '#42597A'); g.addColorStop(0.45, '#2B3E58'); g.addColorStop(1, '#151F2E');
       }
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, s, s);
 
-      ctx.globalAlpha = bone ? 0.18 : 0.22;
-      for (i = 0; i < 26; i++) {
+      /* крап: гранит держится на нём */
+      for (i = 0; i < Math.round(s * 6); i++) {
+        var x = gr() * s, y = gr() * s, r = s * (0.004 + gr() * 0.016);
+        var t = gr();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 6.284);
+        ctx.fillStyle = t > 0.72 ? 'rgba(226,236,248,' + (0.20 + gr() * 0.5).toFixed(2) + ')'
+          : t > 0.42 ? 'rgba(10,16,26,' + (0.18 + gr() * 0.45).toFixed(2) + ')'
+          : 'rgba(150,172,198,' + (0.10 + gr() * 0.28).toFixed(2) + ')';
+        ctx.fill();
+      }
+
+      /* прожилки */
+      for (i = 0; i < 5; i++) {
         ctx.beginPath();
         var y0 = gr() * s;
-        ctx.moveTo(0, y0);
-        ctx.bezierCurveTo(s * 0.3, y0 + (gr() - 0.5) * 8, s * 0.7, y0 + (gr() - 0.5) * 8, s, y0 + (gr() - 0.5) * 6);
-        ctx.strokeStyle = gr() > 0.5 ? 'rgba(255,244,220,.6)' : 'rgba(40,25,8,.6)';
-        ctx.lineWidth = 0.4 + gr();
+        ctx.moveTo(-2, y0);
+        ctx.bezierCurveTo(s * 0.3, y0 + (gr() - 0.5) * s * 0.3,
+                          s * 0.7, y0 + (gr() - 0.5) * s * 0.3, s + 2, y0 + (gr() - 0.5) * s * 0.2);
+        ctx.strokeStyle = gr() > 0.5 ? 'rgba(206,222,240,.13)' : 'rgba(8,14,22,.20)';
+        ctx.lineWidth = 0.6 + gr() * 1.6;
         ctx.stroke();
       }
-      ctx.globalAlpha = 1;
 
       PIPS[value].forEach(function (p) {
-        var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.085;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr * 1.9, 0, 6.284);
-        ctx.strokeStyle = bone ? 'rgba(70,48,18,.38)' : 'rgba(226,206,160,.34)';
-        ctx.lineWidth = s * 0.016;
-        ctx.stroke();
-        var pg = ctx.createRadialGradient(cx - rr * 0.3, cy - rr * 0.35, rr * 0.1, cx, cy, rr);
-        if (bone) { pg.addColorStop(0, '#6A5537'); pg.addColorStop(1, '#241A0D'); }
-        else { pg.addColorStop(0, '#F6EAC8'); pg.addColorStop(1, '#B39A63'); }
+        var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.088;
+        /* лунка */
+        var pg = ctx.createRadialGradient(cx + rr * 0.32, cy + rr * 0.36, rr * 0.06, cx, cy, rr);
+        pg.addColorStop(0, pale ? '#1B2836' : '#0A121C');
+        pg.addColorStop(0.72, pale ? '#101A25' : '#060B12');
+        pg.addColorStop(1, pale ? '#2C4058' : '#16212F');
         ctx.beginPath();
         ctx.arc(cx, cy, rr, 0, 6.284);
         ctx.fillStyle = pg;
         ctx.fill();
+        /* светлый край сверху-слева — свет на кромке отверстия */
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr * 0.98, Math.PI * 0.9, Math.PI * 1.9);
+        ctx.strokeStyle = 'rgba(216,232,250,.42)';
+        ctx.lineWidth = s * 0.014;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr * 0.98, Math.PI * 1.9, Math.PI * 2.9);
+        ctx.strokeStyle = 'rgba(6,10,16,.4)';
+        ctx.lineWidth = s * 0.012;
+        ctx.stroke();
       });
 
-      var hi = ctx.createLinearGradient(0, 0, s * 0.5, s * 0.6);
-      hi.addColorStop(0, bone ? 'rgba(255,255,248,.55)' : 'rgba(255,240,210,.14)');
-      hi.addColorStop(0.6, 'rgba(255,255,255,0)');
+      /* полировка */
+      var hi = ctx.createLinearGradient(0, 0, s * 0.55, s * 0.65);
+      hi.addColorStop(0, 'rgba(233,243,255,' + (pale ? 0.40 : 0.24) + ')');
+      hi.addColorStop(0.55, 'rgba(233,243,255,0)');
       ctx.fillStyle = hi;
       ctx.fillRect(0, 0, s, s);
-      var sh = ctx.createLinearGradient(s * 0.4, s * 0.5, s, s);
+      var sh = ctx.createLinearGradient(s * 0.35, s * 0.45, s, s);
       sh.addColorStop(0, 'rgba(0,0,0,0)');
-      sh.addColorStop(1, bone ? 'rgba(70,48,16,.34)' : 'rgba(0,0,0,.5)');
+      sh.addColorStop(1, 'rgba(2,6,12,.5)');
       ctx.fillStyle = sh;
       ctx.fillRect(0, 0, s, s);
+
+      /* скол кромки */
+      ctx.strokeStyle = 'rgba(222,236,252,.22)';
+      ctx.lineWidth = s * 0.012;
+      rrect(ctx, 2, 2, s - 4, s - 4, s * 0.16);
+      ctx.stroke();
       ctx.restore();
     });
     return cache[key];
@@ -3113,9 +3169,8 @@ button { font: inherit; color: inherit; }
       });
     }
     for (var i = 0; i < 24; i++) lZones.children[i].classList.toggle('live', !!live[i]);
-    var off = !!live.off && sel !== null && destFor(sel).some(function (m) { return m.to === N.OFF; });
-    lZones.children[24].classList.toggle('live', off && S.turn === 'w');
-    lZones.children[25].classList.toggle('live', off && S.turn === 'b');
+    lZones.children[24].classList.remove('live');
+    lZones.children[25].classList.remove('live');
   }
 
   /* ---------- кости ---------- */
@@ -3162,33 +3217,17 @@ button { font: inherit; color: inherit; }
 
   /* ---------- метки возможных ходов ---------- */
 
+  /* Куда дойдёт выбранная шашка: {пункт: цепочка ходов}.
+     При 6-4 сюда попадают и +6, и +4, и +10 одним махом. */
+  var reach = {};
+
   function destFor(i) {
     return legal.filter(function (m) { return m.from === i; });
   }
 
+  /* Ходы не подсвечиваем — игроки опытные, сами видят */
   function renderSpots() {
-    lSpots.innerHTML = '';
-    if (sel === null || busy) return;
-    var k = scale(), seen = {};
-    destFor(sel).forEach(function (m) {
-      if (seen[m.to] !== undefined) return;
-      seen[m.to] = m.die;
-      var q, n;
-      if (m.to === N.OFF) {
-        q = B.trayAt(S.turn, VIS.off[S.turn].length);
-      } else {
-        n = VIS.pts[m.to].length + 1;
-        q = B.manAt(m.to, n - 1, n);
-      }
-      q = px(q.x, q.y, B.CD, k);
-      var s = document.createElement('div');
-      s.className = 'spot';
-      s.dataset.to = m.to;
-      s.dataset.die = m.die;
-      s.innerHTML = '<em>' + m.die + '</em>';
-      s.style.transform = 'translate3d(' + q.x.toFixed(1) + 'px,' + q.y.toFixed(1) + 'px,0)';
-      lSpots.appendChild(s);
-    });
+    if (lSpots.firstChild) lSpots.innerHTML = '';
   }
 
   /* ---------- панели ---------- */
@@ -3424,16 +3463,17 @@ button { font: inherit; color: inherit; }
 
   function pick(i) {
     sel = i;
+    reach = N.chains(S, i);
     place(false);
-    renderSpots();
     markLive();
   }
 
   function clearSel() {
     if (sel === null) return;
     sel = null;
+    reach = {};
     place(false);
-    renderSpots();
+    markLive();
   }
 
   function clearHint() {
@@ -3441,15 +3481,20 @@ button { font: inherit; color: inherit; }
     hinted = null;
   }
 
-  function tryMoveTo(to, die) {
-    var ms = destFor(sel).filter(function (m) { return m.to === to; });
-    if (!ms.length) return false;
-    var mv = ms[0];
-    if (die) { ms.forEach(function (m) { if (m.die === die) mv = m; }); }
+  function tryMoveTo(to) {
+    var path = reach[to];
+    if (!path || !path.length) return false;
     busy = true;
-    doMove(mv);
-    later(260, afterMove);
+    reach = {};
+    playChain(path, 0);
     return true;
+  }
+
+  /* Составной ход показываем по шагам — видно, каким путём шашка идёт */
+  function playChain(path, i) {
+    doMove(path[i]);
+    if (i + 1 < path.length) later(230, function () { playChain(path, i + 1); });
+    else later(260, afterMove);
   }
 
   function canPick(i) {
@@ -3472,9 +3517,12 @@ button { font: inherit; color: inherit; }
       return;
     }
     var i = +z.dataset.i;
-    if (sel !== null && sel !== i && tryMoveTo(i)) return;
+    if (sel !== null && sel !== i) {
+      if (tryMoveTo(i)) return;
+      if (N.cnt(S, i, S.turn) === 0) { sfx('no'); clearSel(); return; }
+    }
     if (!canPick(i)) {
-      if (N.cnt(S, i, S.turn) > 0) toast('Этой шашкой сейчас не сходить');
+      sfx('no');
       clearSel();
       return;
     }
@@ -3515,8 +3563,7 @@ button { font: inherit; color: inherit; }
     var spot = under && under.closest ? under.closest('.spot') : null;
     var zone = under && under.closest ? under.closest('.zone') : null;
     var ok = false;
-    if (spot) ok = tryMoveTo(+spot.dataset.to, +spot.dataset.die);
-    else if (zone && zone.dataset.tray === S.turn) ok = tryMoveTo(N.OFF);
+    if (zone && zone.dataset.tray === S.turn) ok = tryMoveTo(N.OFF);
     else if (zone && !zone.dataset.tray) ok = tryMoveTo(+zone.dataset.i);
     if (!ok) place(false);
   }
@@ -4172,7 +4219,10 @@ button { font: inherit; color: inherit; }
   /* ---------- старт ---------- */
 
   window.NardyDebug = function () {
-    return { mode: opts.mode, code: net.code, seat: net.seat, ready: net.ready,
+    return {
+      roll: S ? S.roll.slice() : null,
+      reach: Object.keys(reach).map(Number),
+      sel: sel, mode: opts.mode, code: net.code, seat: net.seat, ready: net.ready,
              hasTable: !!net.table, hasS: !!S, busy: busy, legal: legal.length,
              isNet: isNet(), status: net.table && net.table.status };
   };

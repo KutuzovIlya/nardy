@@ -252,6 +252,33 @@
     return out;
   }
 
+  /* Куда может дойти одна шашка за весь ход, включая сумму костей:
+     при 6-4 это и +6, и +4, и +10. Каждый шаг обязан быть законным
+     сам по себе — перепрыгнуть занятый пункт нельзя. */
+  function chains(st, from) {
+    var out = {}, memo = {}, seen = {};
+
+    function walk(s, at, path) {
+      if (path.length > 4) return;
+      var key = s.points.join(',') + '|' + at + '|' + s.dice.slice().sort().join('');
+      if (seen[key]) return;
+      seen[key] = 1;
+      var mv = legalMoves(s, memo), i, m, ns, p;
+      for (i = 0; i < mv.length; i++) {
+        m = mv[i];
+        if (m.from !== at) continue;
+        ns = clone(s);
+        applyTo(ns, m);
+        p = path.concat([m]);
+        if (!out[m.to] || out[m.to].length > p.length) out[m.to] = p;
+        if (m.to !== OFF) walk(ns, m.to, p);
+      }
+    }
+
+    walk(clone(st), from, []);
+    return out;
+  }
+
   function rollDie() { return 1 + Math.floor(Math.random() * 6); }
 
   global.Nardy = {
@@ -260,6 +287,6 @@
     create: create, clone: clone, setRoll: setRoll, endTurn: endTurn,
     headLimit: headLimit, allHome: allHome, pips: pips, blockLegal: blockLegal,
     applyTo: applyTo, rawMoves: rawMoves, legalMoves: legalMoves,
-    maxDepth: maxDepth, sequences: sequences, rollDie: rollDie
+    maxDepth: maxDepth, sequences: sequences, chains: chains, rollDie: rollDie
   };
 })(window);
