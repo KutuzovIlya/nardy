@@ -59,6 +59,11 @@
     } catch (e) { return ''; }
   }
 
+  /* Подписанные данные о входе — их проверяет сервер */
+  function initData() {
+    try { return (W && W.initData) || ''; } catch (e) { return ''; }
+  }
+
   function startParam() {
     try {
       var p = W && W.initDataUnsafe && W.initDataUnsafe.start_param;
@@ -105,6 +110,7 @@
     ready: ready,
     userName: userName,
     photo: photo,
+    initData: initData,
     startParam: startParam,
     buzz: buzz,
     deepLink: deepLink,

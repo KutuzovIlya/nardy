@@ -806,6 +806,7 @@
       rows: rows.slice(-60),
       tally: tally,
       toss: t.toss || null,
+      gid: t.gid || null,            /* номер партии для сервера */
       offer: t.offer || null,        /* предложение переиграть */
       declined: t.declined || 0
     };
@@ -1002,6 +1003,7 @@
         var x = toss();
         st.turn = x.turn;
         t.toss = x;
+        t.gid = code + '-' + Date.now();
       }
     }).then(function (r) {
       if (!r.ok) {
@@ -1043,30 +1045,123 @@
       mine = opts.human;
     } else return;
     NardyStats.record(foe, winner === mine, mars);
+    if (isNet() && net.table && net.table.gid) {
+      NardyAccount.report(net.table.gid, foe, winner === mine, mars);
+    }
+  }
+
+  function loginSheet() {
+    sheetKind = 'login';
+    var tgName = NardyTG.userName(), photo = NardyTG.photo();
+    var real = NardyTG.on && !!NardyTG.initData() && NardyAccount.hasServer();
+    openSheet(
+      '<h1>Длинные нарды</h1>' +
+      (real
+        ? '<p class="lede">Вход через Telegram. Профиль, счёт и братишки будут общими на всех ваших устройствах.</p>' +
+          '<div class="field"><ul class="tables"><li>' +
+          (photo ? '<span class="ava"><img alt="" src="' + esc(photo) + '"></span>' : '') +
+          '<span><b>' + esc(tgName || 'Игрок') + '</b></span></li></ul></div>' +
+          '<div class="sheet-actions"><button class="btn btn-key" type="button" data-act="login">' +
+          'Войти' + (tgName ? ' как ' + esc(tgName) : '') + '</button></div>'
+        : '<p class="lede">' +
+          (NardyAccount.hasServer()
+            ? 'Полный вход работает только внутри Telegram. Здесь играем гостем: '
+            : 'Играем гостем: ') +
+          'имя увидит соперник, статистика останется на этом устройстве.</p>' +
+          '<div class="field"><label>Как вас зовут</label>' +
+          '<input class="inp" id="login-name" maxlength="18" placeholder="Игрок" value="' +
+          esc(NardyNet.name() || tgName) + '"></div>' +
+          '<div class="sheet-actions"><button class="btn btn-key" type="button" data-act="login">' +
+          'Играть</button></div>')
+    );
+  }
+
+  function doLogin() {
+    var f = $('login-name');
+    var name = f ? f.value.trim() : '';
+    NardyAccount.login(name).then(function (u) {
+      NardyNet.rename(u.name);
+      if (u.guest && u.why) toast('Вошли гостем: ' + u.why, 2600);
+      setupSheet();
+    });
+  }
+
+  function topSheet() {
+    sheetKind = 'top';
+    openSheet('<h1>Рейтинг</h1><p class="lede">Загружаем…</p>');
+    NardyAccount.top().then(function (d) {
+      var mine = NardyAccount.user();
+      openSheet(
+        '<h1>Рейтинг</h1>' +
+        '<p class="lede">Считается по разнице побед и поражений.</p>' +
+        '<div class="field"><ul class="tables">' +
+        (d.top.length ? d.top.map(function (u, i) {
+          return '<li><b class="mono">' + (i + 1) + '</b><span>' + esc(u.name) +
+            (mine && u.id === mine.id ? ' <em class="bro">вы</em>' : '') + '</span>' +
+            '<span class="dim">' + u.w + ':' + u.l + '</span></li>';
+        }).join('') : '<li class="muted">Пока пусто</li>') +
+        '</ul></div>' +
+        '<div class="sheet-actions">' +
+        '<button class="btn" type="button" data-act="profile">Профиль</button>' +
+        '<button class="btn btn-key" type="button" data-act="close">Закрыть</button></div>'
+      );
+    }, function () {
+      openSheet('<h1>Рейтинг</h1><p class="lede">Сервер не отвечает.</p>' +
+        '<div class="sheet-actions"><button class="btn btn-key" type="button" data-act="close">Закрыть</button></div>');
+    });
   }
 
   function profileSheet() {
-    var st = NardyStats.summary(), t = st.total;
-    var me = NardyNet.name() || NardyTG.userName() || 'Игрок';
-    var rows = st.foes.filter(function (f) { return f.games > 0; }).slice(0, 10);
+    var u = NardyAccount.user();
+    sheetKind = 'profile';
+    if (NardyAccount.hasServer() && u && !u.guest) {
+      openSheet('<h1>' + esc(u.name) + '</h1><p class="lede">Загружаем…</p>');
+      NardyAccount.profile().then(function (d) { drawProfile(d.user); },
+                                 function () { drawProfile(null); });
+      return;
+    }
+    drawProfile(null);
+  }
+
+  /* Профиль показываем с сервера, если он есть; иначе своё, с устройства */
+  function drawProfile(srv) {
+    var u = NardyAccount.user() || {};
+    var name = (srv && srv.name) || u.name || NardyNet.name() || 'Игрок';
+    var t, rows, bros;
+    if (srv) {
+      t = { w: srv.w, l: srv.l, mars: srv.mars, marsLost: srv.marsLost };
+      rows = srv.foes;
+      bros = {};
+      (srv.bros || []).forEach(function (id) { bros[id] = true; });
+    } else {
+      var st = NardyStats.summary();
+      t = st.total;
+      rows = st.foes.filter(function (f) { return f.games > 0; }).slice(0, 10);
+      bros = st.bros;
+    }
     sheetKind = 'profile';
     openSheet(
-      '<h1>' + esc(me) + '</h1>' +
-      '<p class="lede">Победы и поражения считаются на этом устройстве.</p>' +
+      '<h1>' + esc(name) + '</h1>' +
+      '<p class="lede">' + (srv
+        ? 'Общий профиль: считается на сервере, партия засчитывается, когда её подтвердят оба.'
+        : 'Считается на этом устройстве.') + '</p>' +
       '<div class="field"><label>Всего</label>' +
       '<ul class="tables"><li><b class="mono">' + t.w + ' : ' + t.l + '</b>' +
       '<span>' + (t.w + t.l) + ' партий' +
       (t.mars ? ' · марсов ' + t.mars : '') +
       (t.marsLost ? ' · сам ловил ' + t.marsLost : '') + '</span></li></ul></div>' +
       '<div class="field"><label>С кем играл</label><ul class="tables">' +
-      (rows.length ? rows.map(function (f) {
+      (rows && rows.length ? rows.map(function (f) {
         return '<li><b class="mono">' + f.w + ':' + f.l + '</b><span>' + esc(f.name) +
-          (st.bros[f.id] ? ' <em class="bro">братишка</em>' : '') + '</span>' +
-          '<span class="dim">' + f.games + '</span></li>';
+          (bros[f.id] ? ' <em class="bro">братишка</em>' : '') + '</span>' +
+          '<span class="dim">' + (f.games || f.w + f.l) + '</span></li>';
       }).join('') : '<li class="muted">Пока никого. Сыграйте партию.</li>') +
       '</ul></div>' +
       '<div class="sheet-actions">' +
-      '<button class="btn" type="button" data-act="stats-reset">Обнулить</button>' +
+      (NardyAccount.hasServer()
+        ? '<button class="btn" type="button" data-act="top">Рейтинг</button>' +
+          '<button class="btn" type="button" data-act="logout">Выйти</button>'
+        : '<button class="btn" type="button" data-act="stats-reset">Обнулить</button>') +
       '<button class="btn btn-key" type="button" data-act="close">Закрыть</button></div>'
     );
   }
@@ -1085,7 +1180,7 @@
       v: 1, seq: ((net.table && net.table.seq) || 0) + 1, code: net.code, status: 'live',
       createdAt: (net.table && net.table.createdAt) || Date.now(), updatedAt: Date.now(),
       seats: net.table.seats, state: st, rows: [], tally: tally, toss: t,
-      offer: null, declined: 0
+      gid: net.code + '-' + Date.now(), offer: null, declined: 0
     });
   }
 
@@ -1476,6 +1571,9 @@
     else if (act === 'net-quit') quitTable();
     else if (act === 'net-restart') offerRestart();
     else if (act === 'profile') profileSheet();
+    else if (act === 'login') doLogin();
+    else if (act === 'top') topSheet();
+    else if (act === 'logout') { NardyAccount.logout(); loginSheet(); }
     else if (act === 'stats-reset') { NardyStats.reset(); profileSheet(); }
     else if (act === 'offer-yes') answerOffer(true);
     else if (act === 'offer-no') answerOffer(false);
@@ -1552,7 +1650,7 @@
   buildMen();
   place(true);
   updateUI();
-  setupSheet();
+  if (NardyAccount.signed()) setupSheet(); else loginSheet();
 
   /* Сеть подключается отдельно: страница обязана работать и без неё */
   NardyNet.connect().then(function (db) {
