@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  var BOT = 'vashi_nardy_bot';   /* имя бота из @BotFather */
+  var BOT = '';        /* сюда имя бота, когда оно подтвердится */
   var APP = 'nardy';   /* короткое имя мини-приложения из @BotFather */
 
   var W = global.Telegram && global.Telegram.WebApp ? global.Telegram.WebApp : null;
