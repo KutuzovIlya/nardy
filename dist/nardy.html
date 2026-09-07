@@ -642,6 +642,22 @@ button { font: inherit; color: inherit; }
 .tables b { font-weight: 500; letter-spacing: .16em; color: var(--brass-lit); }
 .tables span { color: var(--text-dim); margin-right: auto; }
 .tables .btn { padding: 6px 13px; font-size: 12px; }
+.tables .dim { color: var(--text-dim); margin-right: 0; font-variant-numeric: tabular-nums; }
+
+.bro {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--brass-lit), var(--brass));
+  color: #14100A;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.plaque { cursor: pointer; }
 
 .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 
@@ -1843,88 +1859,74 @@ button { font: inherit; color: inherit; }
     6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]]
   };
 
-  /* Гранитный кубик: белый камень с чёрным крапом, прожилками и
-     полировкой. Точки высверлены — тёмная лунка со светлым краем. */
+  /* Чёрный камень со светящимися точками. Точка — не дырка, а огонёк:
+     сначала ореол вокруг, потом тело, потом добела горячая середина. */
   function die(side, value, px) {
     var key = 'die' + side + value + px;
     if (cache[key]) return cache[key];
     cache[key] = face(px, function (ctx, s) {
-      var pale = side === 'w', i, gr = rnd32(value * 13 + (pale ? 3 : 7));
+      var i, gr = rnd32(value * 17 + 5);
       ctx.save();
       rrect(ctx, 1, 1, s - 2, s - 2, s * 0.17);
       ctx.clip();
 
-      var g = ctx.createLinearGradient(0, 0, s * 0.85, s);
-      if (pale) {
-        g.addColorStop(0, '#F4F3EF'); g.addColorStop(0.45, '#DEDDD7'); g.addColorStop(1, '#B0AFA8');
-      } else {
-        g.addColorStop(0, '#CFCDC5'); g.addColorStop(0.45, '#AFADA4'); g.addColorStop(1, '#7E7C74');
-      }
+      var g = ctx.createLinearGradient(0, 0, s * 0.8, s);
+      g.addColorStop(0, '#2A2A2E');
+      g.addColorStop(0.45, '#161618');
+      g.addColorStop(1, '#070708');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, s, s);
 
-      /* крап: гранит держится на нём */
-      for (i = 0; i < Math.round(s * 6); i++) {
-        var x = gr() * s, y = gr() * s, r = s * (0.004 + gr() * 0.016);
-        var t = gr();
+      /* камень: редкий крап и матовые разводы */
+      for (i = 0; i < Math.round(s * 3); i++) {
+        var x = gr() * s, y = gr() * s, r = s * (0.003 + gr() * 0.012);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 6.284);
-        ctx.fillStyle = t > 0.70 ? 'rgba(24,22,18,' + (0.30 + gr() * 0.55).toFixed(2) + ')'
-          : t > 0.40 ? 'rgba(255,255,252,' + (0.30 + gr() * 0.5).toFixed(2) + ')'
-          : 'rgba(122,118,108,' + (0.14 + gr() * 0.34).toFixed(2) + ')';
+        ctx.fillStyle = gr() > 0.5
+          ? 'rgba(190,195,205,' + (0.05 + gr() * 0.16).toFixed(2) + ')'
+          : 'rgba(0,0,0,' + (0.2 + gr() * 0.4).toFixed(2) + ')';
         ctx.fill();
-      }
-
-      /* прожилки */
-      for (i = 0; i < 5; i++) {
-        ctx.beginPath();
-        var y0 = gr() * s;
-        ctx.moveTo(-2, y0);
-        ctx.bezierCurveTo(s * 0.3, y0 + (gr() - 0.5) * s * 0.3,
-                          s * 0.7, y0 + (gr() - 0.5) * s * 0.3, s + 2, y0 + (gr() - 0.5) * s * 0.2);
-        ctx.strokeStyle = gr() > 0.5 ? 'rgba(255,255,250,.22)' : 'rgba(30,27,22,.16)';
-        ctx.lineWidth = 0.6 + gr() * 1.6;
-        ctx.stroke();
       }
 
       PIPS[value].forEach(function (p) {
-        var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.088;
-        /* лунка */
-        var pg = ctx.createRadialGradient(cx + rr * 0.32, cy + rr * 0.36, rr * 0.06, cx, cy, rr);
-        pg.addColorStop(0, '#3A362E');
-        pg.addColorStop(0.72, '#1A1813');
-        pg.addColorStop(1, '#4A463C');
+        var cx = p[0] / 100 * s, cy = p[1] / 100 * s, rr = s * 0.082;
+
+        /* ореол */
+        var halo = ctx.createRadialGradient(cx, cy, rr * 0.4, cx, cy, rr * 3.1);
+        halo.addColorStop(0, 'rgba(255,196,92,.55)');
+        halo.addColorStop(0.45, 'rgba(255,170,60,.18)');
+        halo.addColorStop(1, 'rgba(255,150,40,0)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr * 3.1, 0, 6.284);
+        ctx.fillStyle = halo;
+        ctx.fill();
+
+        /* тело огонька */
+        var core = ctx.createRadialGradient(cx - rr * 0.2, cy - rr * 0.2, rr * 0.08, cx, cy, rr);
+        core.addColorStop(0, '#FFFDF2');
+        core.addColorStop(0.42, '#FFDE9A');
+        core.addColorStop(0.82, '#E8A63A');
+        core.addColorStop(1, '#9A5F12');
         ctx.beginPath();
         ctx.arc(cx, cy, rr, 0, 6.284);
-        ctx.fillStyle = pg;
+        ctx.fillStyle = core;
         ctx.fill();
-        /* светлый край сверху-слева — свет на кромке отверстия */
+
+        /* добела горячая середина */
         ctx.beginPath();
-        ctx.arc(cx, cy, rr * 0.98, Math.PI * 0.9, Math.PI * 1.9);
-        ctx.strokeStyle = 'rgba(255,255,250,.62)';
-        ctx.lineWidth = s * 0.014;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr * 0.98, Math.PI * 1.9, Math.PI * 2.9);
-        ctx.strokeStyle = 'rgba(40,36,28,.42)';
-        ctx.lineWidth = s * 0.012;
-        ctx.stroke();
+        ctx.arc(cx - rr * 0.16, cy - rr * 0.18, rr * 0.34, 0, 6.284);
+        ctx.fillStyle = 'rgba(255,255,250,.92)';
+        ctx.fill();
       });
 
-      /* полировка */
-      var hi = ctx.createLinearGradient(0, 0, s * 0.55, s * 0.65);
-      hi.addColorStop(0, 'rgba(255,255,252,' + (pale ? 0.52 : 0.34) + ')');
-      hi.addColorStop(0.55, 'rgba(255,255,252,0)');
+      /* полировка по верхней грани */
+      var hi = ctx.createLinearGradient(0, 0, s * 0.5, s * 0.55);
+      hi.addColorStop(0, 'rgba(226,232,244,.22)');
+      hi.addColorStop(0.6, 'rgba(226,232,244,0)');
       ctx.fillStyle = hi;
       ctx.fillRect(0, 0, s, s);
-      var sh = ctx.createLinearGradient(s * 0.35, s * 0.45, s, s);
-      sh.addColorStop(0, 'rgba(0,0,0,0)');
-      sh.addColorStop(1, 'rgba(38,34,26,.36)');
-      ctx.fillStyle = sh;
-      ctx.fillRect(0, 0, s, s);
 
-      /* скол кромки */
-      ctx.strokeStyle = 'rgba(255,255,250,.34)';
+      ctx.strokeStyle = 'rgba(206,214,230,.20)';
       ctx.lineWidth = s * 0.012;
       rrect(ctx, 2, 2, s - 4, s - 4, s * 0.16);
       ctx.stroke();
@@ -2449,6 +2451,75 @@ button { font: inherit; color: inherit; }
   function reset() { quiet = 0; last = {}; }
 
   global.NardyBanter = { line: line, reset: reset };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Профиль игрока. Сервера нет, поэтому история лежит на самом
+   устройстве: это своя статистика для себя, подделывать её
+   некому и незачем. Копим не список партий, а сводку —
+   она не растёт со временем.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var KEY = 'nardy.stats';
+  var data = null;
+
+  function blank() {
+    return { v: 1, total: { w: 0, l: 0, mars: 0, marsLost: 0 }, foes: {} };
+  }
+
+  function load() {
+    if (data) return data;
+    try {
+      data = JSON.parse(localStorage.getItem(KEY) || 'null');
+    } catch (e) { data = null; }
+    if (!data || data.v !== 1 || !data.foes) data = blank();
+    return data;
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  }
+
+  /* foe: {id, name, kind}, kind — 'net' | 'ai' | 'duo' */
+  function record(foe, win, mars) {
+    load();
+    var t = data.total;
+    if (win) { t.w++; if (mars) t.mars++; }
+    else { t.l++; if (mars) t.marsLost++; }
+
+    var id = (foe.kind === 'net' ? 'n:' : foe.kind === 'ai' ? 'a:' : 'd:') + (foe.id || foe.name || '?');
+    var f = data.foes[id];
+    if (!f) f = data.foes[id] = { id: id, name: foe.name || 'Соперник', kind: foe.kind, w: 0, l: 0 };
+    f.name = foe.name || f.name;
+    f.kind = foe.kind;
+    if (win) f.w++; else f.l++;
+    f.last = Date.now();
+    save();
+  }
+
+  function summary() {
+    load();
+    var list = [], id;
+    for (id in data.foes) {
+      var f = data.foes[id];
+      list.push({ id: id, name: f.name, kind: f.kind, w: f.w, l: f.l, games: f.w + f.l, last: f.last || 0 });
+    }
+    /* братишки — живые соперники, с кем сыграно больше всего */
+    var live = list.filter(function (f) { return f.kind === 'net'; })
+      .sort(function (a, b) { return b.games - a.games || b.last - a.last; });
+    /* братишка — не всякий встречный: нужно сыграть хотя бы три партии */
+    var bros = {};
+    live.slice(0, 3).forEach(function (f) { if (f.games >= 3) bros[f.id] = true; });
+    list.sort(function (a, b) { return b.games - a.games || b.last - a.last; });
+    return { total: data.total, foes: list, bros: bros };
+  }
+
+  function reset() { data = blank(); save(); }
+
+  global.NardyStats = { record: record, summary: summary, reset: reset };
 })(window);
 </script>
 <script>
@@ -3705,7 +3776,9 @@ button { font: inherit; color: inherit; }
       state: S,
       rows: rows.slice(-60),
       tally: tally,
-      toss: t.toss || null
+      toss: t.toss || null,
+      offer: t.offer || null,        /* предложение переиграть */
+      declined: t.declined || 0
     };
     if (extra) for (var k in extra) b[k] = extra[k];
     return b;
@@ -3798,6 +3871,21 @@ button { font: inherit; color: inherit; }
       undoStack = [];
     }
     if (t.tally) tally = t.tally;
+
+    /* предложение переиграть: сопернику — вопрос, себе — ответ */
+    if (t.offer && t.offer.by !== net.seat && net.seenOffer !== t.offer.ts) {
+      net.seenOffer = t.offer.ts;
+      offerSheet(t);
+    }
+    if (net.mineOffer && t.declined && t.declined !== net.seenDecline) {
+      net.seenDecline = t.declined;
+      net.mineOffer = 0;
+      toast('Соперник хочет доиграть');
+    }
+    if (net.mineOffer && !t.offer) net.mineOffer = 0;
+    if (sheet.dataset.kind === 'offer' && !t.offer && veil.classList.contains('show')) {
+      closeSheet();
+    }
     /* соперник начал новую партию — убираем со своего экрана итог прошлой */
     if (fresh && !st.winner && sheet.dataset.kind === 'result' && veil.classList.contains('show')) {
       closeSheet();
@@ -3907,19 +3995,68 @@ button { font: inherit; color: inherit; }
     }, function () { toast('Не удалось сесть за стол'); });
   }
 
+  /* Итог партии — в личную историю. Игры вдвоём за одним экраном
+     не записываем: там оба игрока свои, счёт для профиля бессмыслен. */
+  var recorded = false;
+
+  function keepScore(winner, mars) {
+    if (recorded) return;
+    recorded = true;
+    var foe = null, mine;
+    if (isNet()) {
+      var seat = net.table && net.table.seats ? net.table.seats[N.opp(net.seat)] : null;
+      if (!seat) return;
+      foe = { id: seat.id, name: seat.name, kind: 'net' };
+      mine = net.seat;
+    } else if (opts.mode === 'ai') {
+      var lvl = { easy: 'Новичок', normal: 'Опытный', hard: 'Мастер' }[opts.level];
+      foe = { id: opts.level, name: 'Компьютер · ' + lvl, kind: 'ai' };
+      mine = opts.human;
+    } else return;
+    NardyStats.record(foe, winner === mine, mars);
+  }
+
+  function profileSheet() {
+    var st = NardyStats.summary(), t = st.total;
+    var me = NardyNet.name() || NardyTG.userName() || 'Игрок';
+    var rows = st.foes.filter(function (f) { return f.games > 0; }).slice(0, 10);
+    sheetKind = 'profile';
+    openSheet(
+      '<h1>' + esc(me) + '</h1>' +
+      '<p class="lede">Победы и поражения считаются на этом устройстве.</p>' +
+      '<div class="field"><label>Всего</label>' +
+      '<ul class="tables"><li><b class="mono">' + t.w + ' : ' + t.l + '</b>' +
+      '<span>' + (t.w + t.l) + ' партий' +
+      (t.mars ? ' · марсов ' + t.mars : '') +
+      (t.marsLost ? ' · сам ловил ' + t.marsLost : '') + '</span></li></ul></div>' +
+      '<div class="field"><label>С кем играл</label><ul class="tables">' +
+      (rows.length ? rows.map(function (f) {
+        return '<li><b class="mono">' + f.w + ':' + f.l + '</b><span>' + esc(f.name) +
+          (st.bros[f.id] ? ' <em class="bro">братишка</em>' : '') + '</span>' +
+          '<span class="dim">' + f.games + '</span></li>';
+      }).join('') : '<li class="muted">Пока никого. Сыграйте партию.</li>') +
+      '</ul></div>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="stats-reset">Обнулить</button>' +
+      '<button class="btn btn-key" type="button" data-act="close">Закрыть</button></div>'
+    );
+  }
+
   function rematch() {
     if (!isNet()) { newGame(); return; }
     var t = toss(), st = N.create();
     st.turn = t.turn;
     net.shown = false;
-    bf = {}; NardyBanter.reset();
+    bf = {}; recorded = false; NardyBanter.reset();
     hushQuip();
     net.toss = null;
+    net.mineOffer = 0;
     closeSheet();
     NardyNet.write({
       v: 1, seq: ((net.table && net.table.seq) || 0) + 1, code: net.code, status: 'live',
       createdAt: (net.table && net.table.createdAt) || Date.now(), updatedAt: Date.now(),
-      seats: net.table.seats, state: st, rows: [], tally: tally, toss: t
+      seats: net.table.seats, state: st, rows: [], tally: tally, toss: t,
+      offer: null, declined: 0
     });
   }
 
@@ -3985,7 +4122,10 @@ button { font: inherit; color: inherit; }
       '<div class="field"><label>Комментатор</label>' +
       segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
       '</div>' +
+      (S && !S.winner ? '<p class="hint">Партия идёт. Начнёте новую — счёт матча ' +
+        tally.w + ' : ' + tally.b + ' сохранится.</p>' : '') +
       '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="profile">Профиль</button>' +
       '<button class="btn" type="button" data-act="rules">Правила</button>' +
       (saved
         ? '<button class="btn" type="button" data-act="start">Заново</button>' +
@@ -4107,10 +4247,46 @@ button { font: inherit; color: inherit; }
       '<div class="field"><label>Комментатор</label>' +
       segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
       '</div>' +
+      (waiting ? '' :
+        '<p class="hint" style="text-align:center">Счёт матча ' + tally.w + ' : ' + tally.b +
+        ' — при переигровке сохранится.</p>' +
+        '<div class="sheet-actions"><button class="btn" type="button" ' +
+        'data-act="net-restart">Начать заново</button></div>') +
       '<div class="sheet-actions">' +
       '<button class="btn" type="button" data-act="net-quit">Покинуть стол</button>' +
       '<button class="btn btn-key" type="button" data-act="close">К доске</button></div>'
     );
+  }
+
+  /* Переиграть можно только по согласию: предложение уходит сопернику */
+  function offerRestart() {
+    if (!isNet()) return;
+    closeSheet();
+    net.mineOffer = Date.now();
+    pushTable({ offer: { by: net.seat, ts: net.mineOffer } });
+    toast('Предложил начать заново. Ждём ответа');
+  }
+
+  function offerSheet(t) {
+    var by = t.seats ? t.seats[t.offer.by] : null;
+    sheetKind = 'offer';
+    openSheet(
+      '<h1>Начать заново?</h1>' +
+      '<p class="lede">' + esc((by && by.name) || 'Соперник') +
+      ' предлагает бросить эту партию и начать новую. ' +
+      'Счёт матча ' + tally.w + ' : ' + tally.b + ' сохранится.</p>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="offer-no">Доиграем</button>' +
+      '<button class="btn btn-key" type="button" data-act="offer-yes">Согласен</button></div>'
+    );
+  }
+
+  function answerOffer(yes) {
+    closeSheet();
+    if (!isNet() || !net.table) return;
+    if (yes) { rematch(); return; }              /* rematch сам снимет предложение */
+    pushTable({ offer: null, declined: Date.now() });
+    toast('Доигрываем');
   }
 
   function rulesSheet() {
@@ -4142,6 +4318,7 @@ button { font: inherit; color: inherit; }
     markLive();
     var w = S.winner, l = N.opp(w);
     var mars = S.off[l] === 0;
+    keepScore(w, mars);
     quip(mars ? 'mars' : 'win', w, true);
     if (bump !== false) {
       tally[w] += mars ? 2 : 1;
@@ -4199,7 +4376,7 @@ button { font: inherit; color: inherit; }
     if (opts.mode === 'net' && !net.code) { netSheet(); return; }
     closeSheet();
     hushQuip();
-    bf = {}; NardyBanter.reset();
+    bf = {}; recorded = false; NardyBanter.reset();
     forget();
     S = N.create();
     VIS = visFrom(S);
@@ -4235,6 +4412,9 @@ button { font: inherit; color: inherit; }
   lSpots.addEventListener('pointerdown', onDown);
 
   $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : setupSheet(); });
+  ['pl-w', 'pl-b'].forEach(function (id) {
+    $(id).addEventListener('click', function () { if (!busy || S) profileSheet(); });
+  });
   $('act-undo').addEventListener('click', function () { undo(); });
   $('act-hint').addEventListener('click', hint);
   $('act-sound').addEventListener('click', function () {
@@ -4265,6 +4445,11 @@ button { font: inherit; color: inherit; }
     else if (act === 'net-sit') { saveName(); sitDown(e.target.dataset.code); }
     else if (act === 'net-join') { saveName(); sitDown($('net-code') ? $('net-code').value : ''); }
     else if (act === 'net-quit') quitTable();
+    else if (act === 'net-restart') offerRestart();
+    else if (act === 'profile') profileSheet();
+    else if (act === 'stats-reset') { NardyStats.reset(); profileSheet(); }
+    else if (act === 'offer-yes') answerOffer(true);
+    else if (act === 'offer-no') answerOffer(false);
     else if (act === 'net-share') {
       if (!NardyTG.invite(net.code, 'Партию в нарды? Стол ' + net.code)) toast('Не вышло открыть чат');
     }

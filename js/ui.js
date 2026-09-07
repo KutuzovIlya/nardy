@@ -805,7 +805,9 @@
       state: S,
       rows: rows.slice(-60),
       tally: tally,
-      toss: t.toss || null
+      toss: t.toss || null,
+      offer: t.offer || null,        /* предложение переиграть */
+      declined: t.declined || 0
     };
     if (extra) for (var k in extra) b[k] = extra[k];
     return b;
@@ -898,6 +900,21 @@
       undoStack = [];
     }
     if (t.tally) tally = t.tally;
+
+    /* предложение переиграть: сопернику — вопрос, себе — ответ */
+    if (t.offer && t.offer.by !== net.seat && net.seenOffer !== t.offer.ts) {
+      net.seenOffer = t.offer.ts;
+      offerSheet(t);
+    }
+    if (net.mineOffer && t.declined && t.declined !== net.seenDecline) {
+      net.seenDecline = t.declined;
+      net.mineOffer = 0;
+      toast('Соперник хочет доиграть');
+    }
+    if (net.mineOffer && !t.offer) net.mineOffer = 0;
+    if (sheet.dataset.kind === 'offer' && !t.offer && veil.classList.contains('show')) {
+      closeSheet();
+    }
     /* соперник начал новую партию — убираем со своего экрана итог прошлой */
     if (fresh && !st.winner && sheet.dataset.kind === 'result' && veil.classList.contains('show')) {
       closeSheet();
@@ -1007,19 +1024,68 @@
     }, function () { toast('Не удалось сесть за стол'); });
   }
 
+  /* Итог партии — в личную историю. Игры вдвоём за одним экраном
+     не записываем: там оба игрока свои, счёт для профиля бессмыслен. */
+  var recorded = false;
+
+  function keepScore(winner, mars) {
+    if (recorded) return;
+    recorded = true;
+    var foe = null, mine;
+    if (isNet()) {
+      var seat = net.table && net.table.seats ? net.table.seats[N.opp(net.seat)] : null;
+      if (!seat) return;
+      foe = { id: seat.id, name: seat.name, kind: 'net' };
+      mine = net.seat;
+    } else if (opts.mode === 'ai') {
+      var lvl = { easy: 'Новичок', normal: 'Опытный', hard: 'Мастер' }[opts.level];
+      foe = { id: opts.level, name: 'Компьютер · ' + lvl, kind: 'ai' };
+      mine = opts.human;
+    } else return;
+    NardyStats.record(foe, winner === mine, mars);
+  }
+
+  function profileSheet() {
+    var st = NardyStats.summary(), t = st.total;
+    var me = NardyNet.name() || NardyTG.userName() || 'Игрок';
+    var rows = st.foes.filter(function (f) { return f.games > 0; }).slice(0, 10);
+    sheetKind = 'profile';
+    openSheet(
+      '<h1>' + esc(me) + '</h1>' +
+      '<p class="lede">Победы и поражения считаются на этом устройстве.</p>' +
+      '<div class="field"><label>Всего</label>' +
+      '<ul class="tables"><li><b class="mono">' + t.w + ' : ' + t.l + '</b>' +
+      '<span>' + (t.w + t.l) + ' партий' +
+      (t.mars ? ' · марсов ' + t.mars : '') +
+      (t.marsLost ? ' · сам ловил ' + t.marsLost : '') + '</span></li></ul></div>' +
+      '<div class="field"><label>С кем играл</label><ul class="tables">' +
+      (rows.length ? rows.map(function (f) {
+        return '<li><b class="mono">' + f.w + ':' + f.l + '</b><span>' + esc(f.name) +
+          (st.bros[f.id] ? ' <em class="bro">братишка</em>' : '') + '</span>' +
+          '<span class="dim">' + f.games + '</span></li>';
+      }).join('') : '<li class="muted">Пока никого. Сыграйте партию.</li>') +
+      '</ul></div>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="stats-reset">Обнулить</button>' +
+      '<button class="btn btn-key" type="button" data-act="close">Закрыть</button></div>'
+    );
+  }
+
   function rematch() {
     if (!isNet()) { newGame(); return; }
     var t = toss(), st = N.create();
     st.turn = t.turn;
     net.shown = false;
-    bf = {}; NardyBanter.reset();
+    bf = {}; recorded = false; NardyBanter.reset();
     hushQuip();
     net.toss = null;
+    net.mineOffer = 0;
     closeSheet();
     NardyNet.write({
       v: 1, seq: ((net.table && net.table.seq) || 0) + 1, code: net.code, status: 'live',
       createdAt: (net.table && net.table.createdAt) || Date.now(), updatedAt: Date.now(),
-      seats: net.table.seats, state: st, rows: [], tally: tally, toss: t
+      seats: net.table.seats, state: st, rows: [], tally: tally, toss: t,
+      offer: null, declined: 0
     });
   }
 
@@ -1085,7 +1151,10 @@
       '<div class="field"><label>Комментатор</label>' +
       segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
       '</div>' +
+      (S && !S.winner ? '<p class="hint">Партия идёт. Начнёте новую — счёт матча ' +
+        tally.w + ' : ' + tally.b + ' сохранится.</p>' : '') +
       '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="profile">Профиль</button>' +
       '<button class="btn" type="button" data-act="rules">Правила</button>' +
       (saved
         ? '<button class="btn" type="button" data-act="start">Заново</button>' +
@@ -1207,10 +1276,46 @@
       '<div class="field"><label>Комментатор</label>' +
       segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
       '</div>' +
+      (waiting ? '' :
+        '<p class="hint" style="text-align:center">Счёт матча ' + tally.w + ' : ' + tally.b +
+        ' — при переигровке сохранится.</p>' +
+        '<div class="sheet-actions"><button class="btn" type="button" ' +
+        'data-act="net-restart">Начать заново</button></div>') +
       '<div class="sheet-actions">' +
       '<button class="btn" type="button" data-act="net-quit">Покинуть стол</button>' +
       '<button class="btn btn-key" type="button" data-act="close">К доске</button></div>'
     );
+  }
+
+  /* Переиграть можно только по согласию: предложение уходит сопернику */
+  function offerRestart() {
+    if (!isNet()) return;
+    closeSheet();
+    net.mineOffer = Date.now();
+    pushTable({ offer: { by: net.seat, ts: net.mineOffer } });
+    toast('Предложил начать заново. Ждём ответа');
+  }
+
+  function offerSheet(t) {
+    var by = t.seats ? t.seats[t.offer.by] : null;
+    sheetKind = 'offer';
+    openSheet(
+      '<h1>Начать заново?</h1>' +
+      '<p class="lede">' + esc((by && by.name) || 'Соперник') +
+      ' предлагает бросить эту партию и начать новую. ' +
+      'Счёт матча ' + tally.w + ' : ' + tally.b + ' сохранится.</p>' +
+      '<div class="sheet-actions">' +
+      '<button class="btn" type="button" data-act="offer-no">Доиграем</button>' +
+      '<button class="btn btn-key" type="button" data-act="offer-yes">Согласен</button></div>'
+    );
+  }
+
+  function answerOffer(yes) {
+    closeSheet();
+    if (!isNet() || !net.table) return;
+    if (yes) { rematch(); return; }              /* rematch сам снимет предложение */
+    pushTable({ offer: null, declined: Date.now() });
+    toast('Доигрываем');
   }
 
   function rulesSheet() {
@@ -1242,6 +1347,7 @@
     markLive();
     var w = S.winner, l = N.opp(w);
     var mars = S.off[l] === 0;
+    keepScore(w, mars);
     quip(mars ? 'mars' : 'win', w, true);
     if (bump !== false) {
       tally[w] += mars ? 2 : 1;
@@ -1299,7 +1405,7 @@
     if (opts.mode === 'net' && !net.code) { netSheet(); return; }
     closeSheet();
     hushQuip();
-    bf = {}; NardyBanter.reset();
+    bf = {}; recorded = false; NardyBanter.reset();
     forget();
     S = N.create();
     VIS = visFrom(S);
@@ -1335,6 +1441,9 @@
   lSpots.addEventListener('pointerdown', onDown);
 
   $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : setupSheet(); });
+  ['pl-w', 'pl-b'].forEach(function (id) {
+    $(id).addEventListener('click', function () { if (!busy || S) profileSheet(); });
+  });
   $('act-undo').addEventListener('click', function () { undo(); });
   $('act-hint').addEventListener('click', hint);
   $('act-sound').addEventListener('click', function () {
@@ -1365,6 +1474,11 @@
     else if (act === 'net-sit') { saveName(); sitDown(e.target.dataset.code); }
     else if (act === 'net-join') { saveName(); sitDown($('net-code') ? $('net-code').value : ''); }
     else if (act === 'net-quit') quitTable();
+    else if (act === 'net-restart') offerRestart();
+    else if (act === 'profile') profileSheet();
+    else if (act === 'stats-reset') { NardyStats.reset(); profileSheet(); }
+    else if (act === 'offer-yes') answerOffer(true);
+    else if (act === 'offer-no') answerOffer(false);
     else if (act === 'net-share') {
       if (!NardyTG.invite(net.code, 'Партию в нарды? Стол ' + net.code)) toast('Не вышло открыть чат');
     }

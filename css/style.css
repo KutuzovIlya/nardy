@@ -635,6 +635,22 @@ button { font: inherit; color: inherit; }
 .tables b { font-weight: 500; letter-spacing: .16em; color: var(--brass-lit); }
 .tables span { color: var(--text-dim); margin-right: auto; }
 .tables .btn { padding: 6px 13px; font-size: 12px; }
+.tables .dim { color: var(--text-dim); margin-right: 0; font-variant-numeric: tabular-nums; }
+
+.bro {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--brass-lit), var(--brass));
+  color: #14100A;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.plaque { cursor: pointer; }
 
 .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 
