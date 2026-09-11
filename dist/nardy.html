@@ -230,8 +230,7 @@ button { font: inherit; color: inherit; }
   filter: drop-shadow(0 16px 18px rgba(0, 0, 0, .75)) brightness(1.12);
 }
 
-.man.pick::before,
-.man.hint::before {
+.man.pick::before {
   content: "";
   position: absolute;
   inset: -6%;
@@ -239,8 +238,6 @@ button { font: inherit; color: inherit; }
   border: 2px solid var(--brass);
   box-shadow: 0 0 18px rgba(200, 162, 74, .55);
 }
-
-.man.hint::before { border-style: dashed; animation: breathe 1.4s ease-in-out infinite; }
 
 .man.land { animation: land .34s var(--ease); }
 
@@ -266,41 +263,6 @@ button { font: inherit; color: inherit; }
 }
 
 .tag.on-dark { color: #F1E3BE; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
-
-/* ---------- метки хода ---------- */
-
-.spot {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: var(--cd);
-  height: var(--cd);
-  border-radius: 50%;
-  border: 2px solid var(--brass);
-  background: radial-gradient(circle, rgba(200, 162, 74, .24), rgba(200, 162, 74, .04) 70%);
-  box-shadow: 0 0 22px rgba(200, 162, 74, .35);
-  animation: breathe 1.6s ease-in-out infinite;
-  z-index: 4;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-.spot em {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-style: normal;
-  font-size: calc(var(--cd) * .38);
-  color: var(--brass-lit);
-}
-
-@keyframes breathe {
-  0%, 100% { opacity: .55; }
-  50%      { opacity: 1; }
-}
 
 /* ---------- кости ---------- */
 
@@ -882,7 +844,6 @@ button { font: inherit; color: inherit; }
         <canvas id="scene"></canvas>
         <div class="layer hit" id="zones"></div>
         <div class="layer" id="men"></div>
-        <div class="layer" id="spots"></div>
         <canvas class="layer" id="dicefx"></canvas>
         <div class="quip" id="quip"></div>
         <div class="toast" id="toast"></div>
@@ -918,6 +879,7 @@ button { font: inherit; color: inherit; }
 <div class="veil" id="veil">
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Меню"></div>
 </div>
+
 <script>
 /* ============================================================
    Длинные нарды — движок правил
@@ -1762,8 +1724,6 @@ button { font: inherit; color: inherit; }
   var TOPY = FRAME + SHELF;              /* верх верхнего ряда */
   var BOTY = VH - FRAME - SHELF;         /* низ нижнего ряда */
 
-  var flip = false;     /* развернуть доску на 180°, чтобы свой дом был снизу */
-
   var C = {
     frameHi: '#5E3A23', frameLo: '#1E110B',
     bed: '#3E2517', bedLo: '#200F07',
@@ -1772,16 +1732,12 @@ button { font: inherit; color: inherit; }
     brass: '#C8A24A', dark: '#2B1710'
   };
 
-  function setFlip(v) { flip = !!v; }
-  function isFlip() { return flip; }
   function vw() { return VW; }
   function vh() { return VH; }
 
-  /* Разворот доски на 180°: тот же стол, только вы сидите с другой стороны */
-  function map(x, y, w, h) {
-    if (!flip) return { x: x, y: y, w: w, h: h };
-    return { x: VW - x - w, y: VH - y - h, w: w, h: h };
-  }
+  /* Из координат доски — в координаты экрана. Доска не разворачивается:
+     головы стоят на своих местах при любом цвете игрока. */
+  function map(x, y, w, h) { return { x: x, y: y, w: w, h: h }; }
 
   function colX(j) { return FRAME + j * COL + (j >= 6 ? BAR : 0); }
 
@@ -2094,20 +2050,6 @@ button { font: inherit; color: inherit; }
     thiefStar(ctx, b.x + b.w / 2, b.y + b.h / 2, 26);
   }
 
-  /* Надпись стоит ровно, даже если доска развёрнута на 180° */
-  function label(ctx, x, y, text) {
-    ctx.save();
-    ctx.translate(x, y);
-    if (flip) ctx.rotate(Math.PI);
-    ctx.fillStyle = 'rgba(214,178,104,.42)';
-    ctx.font = '500 13px "IBM Plex Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '4px';
-    ctx.fillText(text, 0, 0);
-    ctx.restore();
-  }
-
   function drawBar(ctx) {
     var x = colX(6) - BAR, y = TOPY - 6, h = BOTY - TOPY + 12;
     var g = ctx.createLinearGradient(x, 0, x + BAR, 0);
@@ -2198,7 +2140,6 @@ button { font: inherit; color: inherit; }
     var ctx = canvas.getContext('2d');
     var k = w * dpr / VW;
     ctx.setTransform(k, 0, 0, k, 0, 0);
-    if (flip) { ctx.translate(VW, VH); ctx.rotate(Math.PI); }
     ctx.clearRect(0, 0, VW, VH);
     drawFrame(ctx);
     drawBed(ctx);
@@ -2213,38 +2154,18 @@ button { font: inherit; color: inherit; }
 
   var gerb = null;
 
-  /* Официальный герб — общественное достояние. Перекрашиваем в золото,
-     сохраняя светотень: так он ложится в дерево как инкрустация. */
+  /* Официальный герб — общественное достояние (исходник — assets/gerb.svg).
+     В gerb.png он уже перекрашен в золото: из герба взято только светлое —
+     орёл без красного щита, сверху светлее, снизу темнее. Так он ложится
+     в дерево инкрустацией, а грузится в шесть раз легче исходника. */
   function loadArt(done) {
     var im = new global.Image();
     im.onload = function () {
-      var h = 460, w = Math.round(h * 12331.1 / 14589.7);
-      var c = global.document.createElement('canvas');
-      c.width = w; c.height = h;
-      var x = c.getContext('2d');
-      x.drawImage(im, 0, 0, w, h);
-
-      /* В гербе орёл золотой, щит красный. Берём только светлое —
-         так остаётся один орёл, а щит уходит, и герб ложится
-         в дерево инкрустацией, а не золотой табличкой. */
-      var d = x.getImageData(0, 0, w, h), q = d.data, i, lum, a2, t;
-      for (i = 0; i < q.length; i += 4) {
-        if (!q[i + 3]) continue;
-        lum = (q[i] * 0.299 + q[i + 1] * 0.587 + q[i + 2] * 0.114) / 255;
-        a2 = (lum - 0.30) / 0.42;
-        a2 = a2 < 0 ? 0 : a2 > 1 ? 1 : a2;
-        q[i + 3] = Math.round(q[i + 3] * a2);
-        t = (i / 4 / w) / h;                       /* сверху светлее, снизу темнее */
-        q[i]     = Math.round(206 + 40 * (1 - t) - 30 * (1 - lum));
-        q[i + 1] = Math.round(166 + 36 * (1 - t) - 34 * (1 - lum));
-        q[i + 2] = Math.round(78 + 34 * (1 - t) - 30 * (1 - lum));
-      }
-      x.putImageData(d, 0, 0);
-      gerb = c;
+      gerb = im;
       if (done) done();
     };
     im.onerror = function () { if (done) done(); };
-    im.src = 'assets/gerb.svg';
+    im.src = 'assets/gerb.png';
   }
 
   /* Инкрустация: тёмный отпечаток снизу, золото сверху, блик по краю */
@@ -2466,7 +2387,7 @@ button { font: inherit; color: inherit; }
 
   global.NardyBoard = {
     VW: VW, VH: VH, CD: CD, DD: DD, COL: COL, PTH: PTH,
-    setFlip: setFlip, isFlip: isFlip, vw: vw, vh: vh, map: map, loadArt: loadArt,
+    vw: vw, vh: vh, map: map, loadArt: loadArt,
     geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt,
     gapFor: gapFor, render: render, checker: checker, die: die
   };
@@ -4863,7 +4784,7 @@ button { font: inherit; color: inherit; }
   var $ = function (id) { return document.getElementById(id); };
 
   var board = $('board'), scene = $('scene'), stage = $('stage');
-  var lZones = $('zones'), lMen = $('men'), lSpots = $('spots'), lDice = $('dicefx');
+  var lZones = $('zones'), lMen = $('men');
 
   var S = null;              /* состояние партии */
   var VIS = null;            /* какие шашки где лежат: { pts: [..], off: {} } */
@@ -4874,10 +4795,8 @@ button { font: inherit; color: inherit; }
   var legal = [];
   var busy = true;
   var undoStack = [];
-  var rows = [];             /* журнал ходов */
   var tally = { w: 0, b: 0 };
   var drag = null;
-  var hinted = null;
 
   var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, amb: true, banter: 'hard', timer: 'off', match: '0' };
   try {
@@ -4902,7 +4821,7 @@ button { font: inherit; color: inherit; }
   function persist() {
     if (opts.mode === 'net') return;
     try {
-      localStorage.setItem('nardy.game', JSON.stringify({ s: S, rows: rows }));
+      localStorage.setItem('nardy.game', JSON.stringify({ s: S }));
     } catch (e) {}
   }
 
@@ -5095,7 +5014,6 @@ button { font: inherit; color: inherit; }
     var k = scale(), i, j, ids, n, p, id;
     if (!k) return;
     lMen.style.setProperty('--cd', (B.CD * k) + 'px');
-    lSpots.style.setProperty('--cd', (B.CD * k) + 'px');
 
     if (instant) {
       lMen.style.transition = 'none';
@@ -5136,7 +5054,6 @@ button { font: inherit; color: inherit; }
       for (id in men) men[id].style.transition = '';
     }
     renderDice(false);
-    renderSpots();
     markLive();
   }
 
@@ -5195,15 +5112,6 @@ button { font: inherit; color: inherit; }
   /* Куда дойдёт выбранная шашка: {пункт: цепочка ходов}.
      При 6-4 сюда попадают и +6, и +4, и +10 одним махом. */
   var reach = {};
-
-  function destFor(i) {
-    return legal.filter(function (m) { return m.from === i; });
-  }
-
-  /* Ходы не подсвечиваем — игроки опытные, сами видят */
-  function renderSpots() {
-    if (lSpots.firstChild) lSpots.innerHTML = '';
-  }
 
   /* ---------- панели ---------- */
 
@@ -5339,19 +5247,6 @@ button { font: inherit; color: inherit; }
     });
   }
 
-  function renderLog() {
-    var ol = $('log');
-    if (!ol) return;                 /* журнал убран с экрана */
-    ol.innerHTML = '';
-    rows.slice(-40).forEach(function (r) {
-      var li = document.createElement('li');
-      li.className = r.p;
-      li.innerHTML = '<b>' + nameOf(r.p) + ' ' + r.roll.join('-') + '</b><span>' +
-        (r.moves.length ? r.moves.join(' ') : (r === rows[rows.length - 1] ? '…' : 'пропуск')) + '</span>';
-      ol.appendChild(li);
-    });
-  }
-
   /* ---------- ход ---------- */
 
   /* Пока тикает таймер, состояние может смениться (пришёл ход соперника).
@@ -5370,7 +5265,6 @@ button { font: inherit; color: inherit; }
         pts: VIS.pts.map(function (a) { return a.slice(); }),
         off: { w: VIS.off.w.slice(), b: VIS.off.b.slice() }
       },
-      moves: rows.length ? rows[rows.length - 1].moves.length : 0,
       sent: net.moves.length
     };
   }
@@ -5391,18 +5285,13 @@ button { font: inherit; color: inherit; }
       N.applyTo(S, mv);
       if (auth() && p === net.seat) net.moves.push({ from: mv.from, to: mv.to, die: mv.die });
     });
-    if (rows.length) {
-      rows[rows.length - 1].moves.push(N.label(p, path[0].from) + '/' + N.label(p, last.to));
-    }
     sel = null;
-    clearHint();
     place(false);
     men[id].classList.remove('land');
     void men[id].offsetWidth;
     men[id].classList.add('land');
     sfx(last.to === N.OFF ? 'off' : 'move');
     if (last.to === N.OFF) quip('off', p);
-    renderLog();
     updateUI();
     persist();
     /* По сети отдельные шашки не шлём: сопернику уходит весь ход разом,
@@ -5416,11 +5305,9 @@ button { font: inherit; color: inherit; }
     S = s.st;
     VIS = s.vis;
     net.moves.length = s.sent;
-    if (rows.length) rows[rows.length - 1].moves.length = s.moves;
     sel = null;
     legal = N.legalMoves(S);
     place(false);
-    renderLog();
     updateUI();
   }
 
@@ -5432,7 +5319,7 @@ button { font: inherit; color: inherit; }
       later(850, passTurn);
       return;
     }
-    if (!isAI(S.turn)) { busy = false; renderSpots(); }
+    if (!isAI(S.turn)) busy = false;
     markLive();
     updateUI();
   }
@@ -5448,15 +5335,12 @@ button { font: inherit; color: inherit; }
   function beginTurn() {
     sel = null;
     undoStack = [];
-    clearHint();
     busy = true;
     misses = 0;
     tick++;
     var d1 = N.rollDie(), d2 = N.rollDie();
     N.setRoll(S, d1, d2);
-    rows.push({ p: S.turn, roll: [d1, d2], moves: [] });
     renderDice(true);
-    renderLog();
     sfx('dice');
     legal = N.legalMoves(S);
     updateUI();
@@ -5516,11 +5400,6 @@ button { font: inherit; color: inherit; }
     reach = {};
     place(false);
     markLive();
-  }
-
-  function clearHint() {
-    if (hinted && men[hinted]) men[hinted].classList.remove('hint');
-    hinted = null;
   }
 
   function tryMoveTo(to) {
@@ -5924,11 +5803,9 @@ button { font: inherit; color: inherit; }
       tick++;                       /* всё отложенное по старой позиции отменяем */
       var rolled = !S || S.roll.join() !== st.roll.join() || S.turn !== st.turn;
       S = st;
-      rows = t.rows || [];
       if (!VIS) VIS = visFrom(S);
       reconcile();
       renderDice(rolled);
-      renderLog();
       sel = null;
       undoStack = [];
     }
@@ -6011,7 +5888,6 @@ button { font: inherit; color: inherit; }
     net.gid = null;
     net.turnKey = '';
     S = null;
-    rows = [];
     tally = r.table.tally || { w: 0, b: 0 };
     VIS = visFrom(r.table.state);
     closeSheet();
@@ -6039,11 +5915,10 @@ button { font: inherit; color: inherit; }
     net.seat = seat;
     net.table = null;
     S = null;
-    rows = [];
     VIS = visFrom(fresh);
     var body = {
       v: 1, seq: 1, status: 'open', createdAt: Date.now(), updatedAt: Date.now(),
-      seats: seats, state: fresh, rows: [], tally: { w: 0, b: 0 }, toss: null
+      seats: seats, state: fresh, tally: { w: 0, b: 0 }, toss: null
     };
     NardyNet.create(body).then(function (code) {
       tally = { w: 0, b: 0 };
@@ -6078,7 +5953,6 @@ button { font: inherit; color: inherit; }
       net.seat = r.seat;
       net.table = r.table;
       S = null;
-      rows = [];
       VIS = visFrom(r.table.state);
       closeSheet();
       openTable(code);
@@ -6485,7 +6359,7 @@ button { font: inherit; color: inherit; }
     NardyNet.write({
       v: 1, seq: ((net.table && net.table.seq) || 0) + 1, code: net.code, status: 'live',
       createdAt: (net.table && net.table.createdAt) || Date.now(), updatedAt: Date.now(),
-      seats: net.table.seats, state: st, rows: [], tally: tally, toss: t,
+      seats: net.table.seats, state: st, tally: tally, toss: t,
       gid: net.code + '-' + Date.now(), offer: null, declined: 0
     });
   }
@@ -6506,7 +6380,7 @@ button { font: inherit; color: inherit; }
     opts.mode = 'ai';
     save();
     busy = true;
-    if (!silent) { S = null; VIS = visFrom(N.create()); buildMen(); place(true); rows = []; renderLog(); updateUI(); }
+    if (!silent) { S = null; VIS = visFrom(N.create()); buildMen(); place(true); updateUI(); }
     homeSheet();
   }
 
@@ -6766,7 +6640,6 @@ button { font: inherit; color: inherit; }
     forget();
     sel = null;
     net.shown = true;
-    renderSpots();
     markLive();
     var w = S.winner, l = N.opp(w);
     /* у серверного стола итог записан в самом столе: там и марс, и причина */
@@ -6817,14 +6690,12 @@ button { font: inherit; color: inherit; }
     if (!saved) { newGame(); return; }
     closeSheet();
     S = saved.s;
-    rows = saved.rows || [];
     VIS = visFrom(S);
     undoStack = [];
     sel = null;
     busy = true;
     buildMen();
     place(true);
-    renderLog();
     updateUI();
     if (!S.dice.length) { beginTurn(); return; }
     renderDice(false);
@@ -6843,13 +6714,11 @@ button { font: inherit; color: inherit; }
     forget();
     S = N.create();
     VIS = visFrom(S);
-    rows = [];
     undoStack = [];
     sel = null;
     legal = [];
     buildMen();
     place(true);
-    renderLog();
     updateUI();
     opening();
   }
@@ -6872,7 +6741,6 @@ button { font: inherit; color: inherit; }
   lZones.addEventListener('pointermove', onMove);
   lZones.addEventListener('pointerup', onUp);
   lZones.addEventListener('pointercancel', onCancel);
-  lSpots.addEventListener('pointerdown', onDown);
 
   $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : homeSheet(); });
   /* своя табличка — свой профиль, табличка соперника по сети — его профиль */
@@ -7052,7 +6920,6 @@ button { font: inherit; color: inherit; }
       net.table = t;
       tally = t.tally || tally;
       S = null;
-      rows = [];
       closeSheet();
       if (NardyNet.authoritative()) {
         net.table = null;

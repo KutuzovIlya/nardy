@@ -29,8 +29,6 @@
   var TOPY = FRAME + SHELF;              /* верх верхнего ряда */
   var BOTY = VH - FRAME - SHELF;         /* низ нижнего ряда */
 
-  var flip = false;     /* развернуть доску на 180°, чтобы свой дом был снизу */
-
   var C = {
     frameHi: '#5E3A23', frameLo: '#1E110B',
     bed: '#3E2517', bedLo: '#200F07',
@@ -39,16 +37,12 @@
     brass: '#C8A24A', dark: '#2B1710'
   };
 
-  function setFlip(v) { flip = !!v; }
-  function isFlip() { return flip; }
   function vw() { return VW; }
   function vh() { return VH; }
 
-  /* Разворот доски на 180°: тот же стол, только вы сидите с другой стороны */
-  function map(x, y, w, h) {
-    if (!flip) return { x: x, y: y, w: w, h: h };
-    return { x: VW - x - w, y: VH - y - h, w: w, h: h };
-  }
+  /* Из координат доски — в координаты экрана. Доска не разворачивается:
+     головы стоят на своих местах при любом цвете игрока. */
+  function map(x, y, w, h) { return { x: x, y: y, w: w, h: h }; }
 
   function colX(j) { return FRAME + j * COL + (j >= 6 ? BAR : 0); }
 
@@ -361,20 +355,6 @@
     thiefStar(ctx, b.x + b.w / 2, b.y + b.h / 2, 26);
   }
 
-  /* Надпись стоит ровно, даже если доска развёрнута на 180° */
-  function label(ctx, x, y, text) {
-    ctx.save();
-    ctx.translate(x, y);
-    if (flip) ctx.rotate(Math.PI);
-    ctx.fillStyle = 'rgba(214,178,104,.42)';
-    ctx.font = '500 13px "IBM Plex Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '4px';
-    ctx.fillText(text, 0, 0);
-    ctx.restore();
-  }
-
   function drawBar(ctx) {
     var x = colX(6) - BAR, y = TOPY - 6, h = BOTY - TOPY + 12;
     var g = ctx.createLinearGradient(x, 0, x + BAR, 0);
@@ -465,7 +445,6 @@
     var ctx = canvas.getContext('2d');
     var k = w * dpr / VW;
     ctx.setTransform(k, 0, 0, k, 0, 0);
-    if (flip) { ctx.translate(VW, VH); ctx.rotate(Math.PI); }
     ctx.clearRect(0, 0, VW, VH);
     drawFrame(ctx);
     drawBed(ctx);
@@ -480,38 +459,18 @@
 
   var gerb = null;
 
-  /* Официальный герб — общественное достояние. Перекрашиваем в золото,
-     сохраняя светотень: так он ложится в дерево как инкрустация. */
+  /* Официальный герб — общественное достояние (исходник — assets/gerb.svg).
+     В gerb.png он уже перекрашен в золото: из герба взято только светлое —
+     орёл без красного щита, сверху светлее, снизу темнее. Так он ложится
+     в дерево инкрустацией, а грузится в шесть раз легче исходника. */
   function loadArt(done) {
     var im = new global.Image();
     im.onload = function () {
-      var h = 460, w = Math.round(h * 12331.1 / 14589.7);
-      var c = global.document.createElement('canvas');
-      c.width = w; c.height = h;
-      var x = c.getContext('2d');
-      x.drawImage(im, 0, 0, w, h);
-
-      /* В гербе орёл золотой, щит красный. Берём только светлое —
-         так остаётся один орёл, а щит уходит, и герб ложится
-         в дерево инкрустацией, а не золотой табличкой. */
-      var d = x.getImageData(0, 0, w, h), q = d.data, i, lum, a2, t;
-      for (i = 0; i < q.length; i += 4) {
-        if (!q[i + 3]) continue;
-        lum = (q[i] * 0.299 + q[i + 1] * 0.587 + q[i + 2] * 0.114) / 255;
-        a2 = (lum - 0.30) / 0.42;
-        a2 = a2 < 0 ? 0 : a2 > 1 ? 1 : a2;
-        q[i + 3] = Math.round(q[i + 3] * a2);
-        t = (i / 4 / w) / h;                       /* сверху светлее, снизу темнее */
-        q[i]     = Math.round(206 + 40 * (1 - t) - 30 * (1 - lum));
-        q[i + 1] = Math.round(166 + 36 * (1 - t) - 34 * (1 - lum));
-        q[i + 2] = Math.round(78 + 34 * (1 - t) - 30 * (1 - lum));
-      }
-      x.putImageData(d, 0, 0);
-      gerb = c;
+      gerb = im;
       if (done) done();
     };
     im.onerror = function () { if (done) done(); };
-    im.src = 'assets/gerb.svg';
+    im.src = 'assets/gerb.png';
   }
 
   /* Инкрустация: тёмный отпечаток снизу, золото сверху, блик по краю */
@@ -733,7 +692,7 @@
 
   global.NardyBoard = {
     VW: VW, VH: VH, CD: CD, DD: DD, COL: COL, PTH: PTH,
-    setFlip: setFlip, isFlip: isFlip, vw: vw, vh: vh, map: map, loadArt: loadArt,
+    vw: vw, vh: vh, map: map, loadArt: loadArt,
     geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt,
     gapFor: gapFor, render: render, checker: checker, die: die
   };

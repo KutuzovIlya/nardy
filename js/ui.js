@@ -8,7 +8,7 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var board = $('board'), scene = $('scene'), stage = $('stage');
-  var lZones = $('zones'), lMen = $('men'), lSpots = $('spots'), lDice = $('dicefx');
+  var lZones = $('zones'), lMen = $('men');
 
   var S = null;              /* состояние партии */
   var VIS = null;            /* какие шашки где лежат: { pts: [..], off: {} } */
@@ -19,10 +19,8 @@
   var legal = [];
   var busy = true;
   var undoStack = [];
-  var rows = [];             /* журнал ходов */
   var tally = { w: 0, b: 0 };
   var drag = null;
-  var hinted = null;
 
   var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, amb: true, banter: 'hard', timer: 'off', match: '0' };
   try {
@@ -47,7 +45,7 @@
   function persist() {
     if (opts.mode === 'net') return;
     try {
-      localStorage.setItem('nardy.game', JSON.stringify({ s: S, rows: rows }));
+      localStorage.setItem('nardy.game', JSON.stringify({ s: S }));
     } catch (e) {}
   }
 
@@ -240,7 +238,6 @@
     var k = scale(), i, j, ids, n, p, id;
     if (!k) return;
     lMen.style.setProperty('--cd', (B.CD * k) + 'px');
-    lSpots.style.setProperty('--cd', (B.CD * k) + 'px');
 
     if (instant) {
       lMen.style.transition = 'none';
@@ -281,7 +278,6 @@
       for (id in men) men[id].style.transition = '';
     }
     renderDice(false);
-    renderSpots();
     markLive();
   }
 
@@ -340,15 +336,6 @@
   /* Куда дойдёт выбранная шашка: {пункт: цепочка ходов}.
      При 6-4 сюда попадают и +6, и +4, и +10 одним махом. */
   var reach = {};
-
-  function destFor(i) {
-    return legal.filter(function (m) { return m.from === i; });
-  }
-
-  /* Ходы не подсвечиваем — игроки опытные, сами видят */
-  function renderSpots() {
-    if (lSpots.firstChild) lSpots.innerHTML = '';
-  }
 
   /* ---------- панели ---------- */
 
@@ -484,19 +471,6 @@
     });
   }
 
-  function renderLog() {
-    var ol = $('log');
-    if (!ol) return;                 /* журнал убран с экрана */
-    ol.innerHTML = '';
-    rows.slice(-40).forEach(function (r) {
-      var li = document.createElement('li');
-      li.className = r.p;
-      li.innerHTML = '<b>' + nameOf(r.p) + ' ' + r.roll.join('-') + '</b><span>' +
-        (r.moves.length ? r.moves.join(' ') : (r === rows[rows.length - 1] ? '…' : 'пропуск')) + '</span>';
-      ol.appendChild(li);
-    });
-  }
-
   /* ---------- ход ---------- */
 
   /* Пока тикает таймер, состояние может смениться (пришёл ход соперника).
@@ -515,7 +489,6 @@
         pts: VIS.pts.map(function (a) { return a.slice(); }),
         off: { w: VIS.off.w.slice(), b: VIS.off.b.slice() }
       },
-      moves: rows.length ? rows[rows.length - 1].moves.length : 0,
       sent: net.moves.length
     };
   }
@@ -536,18 +509,13 @@
       N.applyTo(S, mv);
       if (auth() && p === net.seat) net.moves.push({ from: mv.from, to: mv.to, die: mv.die });
     });
-    if (rows.length) {
-      rows[rows.length - 1].moves.push(N.label(p, path[0].from) + '/' + N.label(p, last.to));
-    }
     sel = null;
-    clearHint();
     place(false);
     men[id].classList.remove('land');
     void men[id].offsetWidth;
     men[id].classList.add('land');
     sfx(last.to === N.OFF ? 'off' : 'move');
     if (last.to === N.OFF) quip('off', p);
-    renderLog();
     updateUI();
     persist();
     /* По сети отдельные шашки не шлём: сопернику уходит весь ход разом,
@@ -561,11 +529,9 @@
     S = s.st;
     VIS = s.vis;
     net.moves.length = s.sent;
-    if (rows.length) rows[rows.length - 1].moves.length = s.moves;
     sel = null;
     legal = N.legalMoves(S);
     place(false);
-    renderLog();
     updateUI();
   }
 
@@ -577,7 +543,7 @@
       later(850, passTurn);
       return;
     }
-    if (!isAI(S.turn)) { busy = false; renderSpots(); }
+    if (!isAI(S.turn)) busy = false;
     markLive();
     updateUI();
   }
@@ -593,15 +559,12 @@
   function beginTurn() {
     sel = null;
     undoStack = [];
-    clearHint();
     busy = true;
     misses = 0;
     tick++;
     var d1 = N.rollDie(), d2 = N.rollDie();
     N.setRoll(S, d1, d2);
-    rows.push({ p: S.turn, roll: [d1, d2], moves: [] });
     renderDice(true);
-    renderLog();
     sfx('dice');
     legal = N.legalMoves(S);
     updateUI();
@@ -661,11 +624,6 @@
     reach = {};
     place(false);
     markLive();
-  }
-
-  function clearHint() {
-    if (hinted && men[hinted]) men[hinted].classList.remove('hint');
-    hinted = null;
   }
 
   function tryMoveTo(to) {
@@ -1069,11 +1027,9 @@
       tick++;                       /* всё отложенное по старой позиции отменяем */
       var rolled = !S || S.roll.join() !== st.roll.join() || S.turn !== st.turn;
       S = st;
-      rows = t.rows || [];
       if (!VIS) VIS = visFrom(S);
       reconcile();
       renderDice(rolled);
-      renderLog();
       sel = null;
       undoStack = [];
     }
@@ -1156,7 +1112,6 @@
     net.gid = null;
     net.turnKey = '';
     S = null;
-    rows = [];
     tally = r.table.tally || { w: 0, b: 0 };
     VIS = visFrom(r.table.state);
     closeSheet();
@@ -1184,11 +1139,10 @@
     net.seat = seat;
     net.table = null;
     S = null;
-    rows = [];
     VIS = visFrom(fresh);
     var body = {
       v: 1, seq: 1, status: 'open', createdAt: Date.now(), updatedAt: Date.now(),
-      seats: seats, state: fresh, rows: [], tally: { w: 0, b: 0 }, toss: null
+      seats: seats, state: fresh, tally: { w: 0, b: 0 }, toss: null
     };
     NardyNet.create(body).then(function (code) {
       tally = { w: 0, b: 0 };
@@ -1223,7 +1177,6 @@
       net.seat = r.seat;
       net.table = r.table;
       S = null;
-      rows = [];
       VIS = visFrom(r.table.state);
       closeSheet();
       openTable(code);
@@ -1630,7 +1583,7 @@
     NardyNet.write({
       v: 1, seq: ((net.table && net.table.seq) || 0) + 1, code: net.code, status: 'live',
       createdAt: (net.table && net.table.createdAt) || Date.now(), updatedAt: Date.now(),
-      seats: net.table.seats, state: st, rows: [], tally: tally, toss: t,
+      seats: net.table.seats, state: st, tally: tally, toss: t,
       gid: net.code + '-' + Date.now(), offer: null, declined: 0
     });
   }
@@ -1651,7 +1604,7 @@
     opts.mode = 'ai';
     save();
     busy = true;
-    if (!silent) { S = null; VIS = visFrom(N.create()); buildMen(); place(true); rows = []; renderLog(); updateUI(); }
+    if (!silent) { S = null; VIS = visFrom(N.create()); buildMen(); place(true); updateUI(); }
     homeSheet();
   }
 
@@ -1911,7 +1864,6 @@
     forget();
     sel = null;
     net.shown = true;
-    renderSpots();
     markLive();
     var w = S.winner, l = N.opp(w);
     /* у серверного стола итог записан в самом столе: там и марс, и причина */
@@ -1962,14 +1914,12 @@
     if (!saved) { newGame(); return; }
     closeSheet();
     S = saved.s;
-    rows = saved.rows || [];
     VIS = visFrom(S);
     undoStack = [];
     sel = null;
     busy = true;
     buildMen();
     place(true);
-    renderLog();
     updateUI();
     if (!S.dice.length) { beginTurn(); return; }
     renderDice(false);
@@ -1988,13 +1938,11 @@
     forget();
     S = N.create();
     VIS = visFrom(S);
-    rows = [];
     undoStack = [];
     sel = null;
     legal = [];
     buildMen();
     place(true);
-    renderLog();
     updateUI();
     opening();
   }
@@ -2017,7 +1965,6 @@
   lZones.addEventListener('pointermove', onMove);
   lZones.addEventListener('pointerup', onUp);
   lZones.addEventListener('pointercancel', onCancel);
-  lSpots.addEventListener('pointerdown', onDown);
 
   $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : homeSheet(); });
   /* своя табличка — свой профиль, табличка соперника по сети — его профиль */
@@ -2197,7 +2144,6 @@
       net.table = t;
       tally = t.tally || tally;
       S = null;
-      rows = [];
       closeSheet();
       if (NardyNet.authoritative()) {
         net.table = null;

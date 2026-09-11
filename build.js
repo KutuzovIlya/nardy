@@ -9,9 +9,6 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 let html = read('index.html');
 
-/* заглушка хранилища нужна только для локальной отладки */
-html = html.replace(/\s*<script src="js\/mock-db\.js[^"]*"><\/script>/, '');
-
 /* внутрь артефакта внешние скрипты не пускает политика безопасности */
 html = html.replace(/\s*<script src="https:\/\/telegram\.org[^"]*"><\/script>/, '');
 

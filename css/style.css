@@ -223,8 +223,7 @@ button { font: inherit; color: inherit; }
   filter: drop-shadow(0 16px 18px rgba(0, 0, 0, .75)) brightness(1.12);
 }
 
-.man.pick::before,
-.man.hint::before {
+.man.pick::before {
   content: "";
   position: absolute;
   inset: -6%;
@@ -232,8 +231,6 @@ button { font: inherit; color: inherit; }
   border: 2px solid var(--brass);
   box-shadow: 0 0 18px rgba(200, 162, 74, .55);
 }
-
-.man.hint::before { border-style: dashed; animation: breathe 1.4s ease-in-out infinite; }
 
 .man.land { animation: land .34s var(--ease); }
 
@@ -259,41 +256,6 @@ button { font: inherit; color: inherit; }
 }
 
 .tag.on-dark { color: #F1E3BE; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
-
-/* ---------- метки хода ---------- */
-
-.spot {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: var(--cd);
-  height: var(--cd);
-  border-radius: 50%;
-  border: 2px solid var(--brass);
-  background: radial-gradient(circle, rgba(200, 162, 74, .24), rgba(200, 162, 74, .04) 70%);
-  box-shadow: 0 0 22px rgba(200, 162, 74, .35);
-  animation: breathe 1.6s ease-in-out infinite;
-  z-index: 4;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-.spot em {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-style: normal;
-  font-size: calc(var(--cd) * .38);
-  color: var(--brass-lit);
-}
-
-@keyframes breathe {
-  0%, 100% { opacity: .55; }
-  50%      { opacity: 1; }
-}
 
 /* ---------- кости ---------- */
 
