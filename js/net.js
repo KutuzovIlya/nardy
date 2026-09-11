@@ -154,10 +154,16 @@
 
     function topic(code) { return 'nardy-' + code; }
 
-    /* последнее состояние стола: берём самое свежее сообщение темы */
+    /* Последнее состояние стола. Раньше тянулась вся история темы за 12 часов —
+       к концу партии это полтора мегабайта на каждый опрос. Теперь только
+       последнее сообщение; если ретранслятор так не умеет — по-старому. */
     function poll(code) {
-      return fetch(RELAY + '/' + topic(code) + '/json?poll=1&since=12h', { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.text() : ''; })
+      var base = RELAY + '/' + topic(code) + '/json?poll=1&since=';
+      return fetch(base + 'latest', { cache: 'no-store' })
+        .then(function (r) {
+          if (r.ok) return r.text();
+          return fetch(base + '12h', { cache: 'no-store' }).then(function (r2) { return r2.ok ? r2.text() : ''; });
+        })
         .then(function (txt) {
           var lines = txt.split('\n'), last = null, i, o;
           for (i = 0; i < lines.length; i++) {
@@ -170,12 +176,47 @@
         });
     }
 
-    function send(body) {
+    function sendOnce(body) {
       return fetch(RELAY + '/' + topic(body.code), {
         method: 'POST',
         body: JSON.stringify(body)
       }).then(function (r) {
         if (!r.ok) throw new Error('relay ' + r.status);
+      });
+    }
+
+    /* Отправка с повтором. Важен только последний вариант стола, поэтому
+       держим одну ячейку «к отправке»: новая запись вытесняет старую,
+       а неудача не теряет ход — повторяем, пока не уйдёт. */
+    var pending = null, waiters = [], busySend = false, tries = 0;
+
+    function flush() {
+      if (busySend || !pending) return;
+      busySend = true;
+      var body = pending;
+      sendOnce(body).then(function () {
+        busySend = false;
+        if (pending === body) {
+          pending = null;
+          var w = waiters; waiters = [];
+          if (tries && global.NardyNet && NardyNet.onBack) NardyNet.onBack();
+          tries = 0;
+          w.forEach(function (f) { f.ok(); });
+        }
+        flush();
+      }, function () {
+        busySend = false;
+        tries++;
+        if (tries === 1 && global.NardyNet && NardyNet.onLost) NardyNet.onLost();
+        setTimeout(flush, Math.min(15000, 800 * Math.pow(2, tries - 1)));
+      });
+    }
+
+    function send(body) {
+      pending = body;
+      return new Promise(function (ok, no) {
+        waiters.push({ ok: ok, no: no });
+        flush();
       });
     }
 
@@ -246,9 +287,14 @@
           poll(code).then(deliver, function () {});
         }, 25000);
 
+        /* вернулись из фона — сразу подтягиваем ходы, не ждём таймера */
+        function wake() { if (!document.hidden) poll(code).then(deliver, function () {}); }
+        document.addEventListener('visibilitychange', wake);
+
         return function () {
           dead = true;
           clearInterval(timer);
+          document.removeEventListener('visibilitychange', wake);
           if (es) es.close();
         };
       },

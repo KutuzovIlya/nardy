@@ -4,8 +4,11 @@
     {
       "name": "nardy",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["serve.js", "8765"],
-      "port": 8765
+      "runtimeArgs": [
+        "serve.js"
+      ],
+      "port": 8767,
+      "autoPort": true
     }
   ]
 }

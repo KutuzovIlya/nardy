@@ -447,7 +447,6 @@
     }
     var my = canPlay();
     $('act-undo').disabled = !(my && undoStack.length);
-    $('act-hint').disabled = !(my && legal.length);
     setSides();
     setAvatars();
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
@@ -533,8 +532,8 @@
     renderLog();
     updateUI();
     persist();
-    /* победный ход уходит одной записью вместе со счётом — см. finish() */
-    if (!S.winner) pushTable();
+    /* По сети отдельные шашки не шлём: сопернику уходит весь ход разом,
+       при передаче хода. Победу отправляет finish() вместе со счётом. */
   }
 
   function undo() {
@@ -549,7 +548,6 @@
     place(false);
     renderLog();
     updateUI();
-    pushTable();
   }
 
   function afterMove() {
@@ -577,6 +575,7 @@
     undoStack = [];
     clearHint();
     busy = true;
+    misses = 0;
     tick++;
     var d1 = N.rollDie(), d2 = N.rollDie();
     N.setRoll(S, d1, d2);
@@ -670,6 +669,15 @@
 
   /* ---------- указатель: клик и перетаскивание ---------- */
 
+  /* Промах: щелчок и отдача, а на каждый третий за ход — фраза */
+  var misses = 0;
+
+  function miss() {
+    sfx('no');
+    misses++;
+    if (misses % 3 === 0) quip('miss', S.turn, true);
+  }
+
   function onDown(e) {
     if (!canPlay()) return;
     var z = e.target.closest ? e.target.closest('.zone') : null;
@@ -681,10 +689,10 @@
     var i = +z.dataset.i;
     if (sel !== null && sel !== i) {
       if (tryMoveTo(i)) return;
-      if (N.cnt(S, i, S.turn) === 0) { sfx('no'); clearSel(); return; }
+      if (N.cnt(S, i, S.turn) === 0) { miss(); clearSel(); return; }
     }
     if (!canPick(i)) {
-      sfx('no');
+      miss();
       clearSel();
       return;
     }
@@ -753,25 +761,11 @@
     if (!d.moved) { place(false); return; }      /* просто нажали — шашка выбрана */
     var to = dropTarget(e.clientX, e.clientY);
     if (to === null || !tryMoveTo(to)) {
-      sfx('no');
+      miss();
       place(false);
     }
   }
 
-  /* ---------- подсказка ---------- */
-
-  function hint() {
-    if (!canPlay() || !legal.length) return;
-    var path = AI.choose(S, 'hard');
-    if (!path.length) return;
-    quip('hint', S.turn);
-    var mv = path[0];
-    pick(mv.from);
-    var ids = VIS.pts[mv.from];
-    hinted = ids[ids.length - 1];
-    men[hinted].classList.add('hint');
-    toast('Совет: ' + N.label(S.turn, mv.from) + '/' + N.label(S.turn, mv.to));
-  }
 
   /* ---------- игра по сети ---------- */
 
@@ -803,7 +797,6 @@
       updatedAt: Date.now(),
       seats: t.seats || { w: null, b: null },
       state: S,
-      rows: rows.slice(-60),
       tally: tally,
       toss: t.toss || null,
       gid: t.gid || null,            /* номер партии для сервера */
@@ -813,6 +806,9 @@
     if (extra) for (var k in extra) b[k] = extra[k];
     return b;
   }
+
+  NardyNet.onLost = function () { if (isNet()) toast('Нет связи — ход уйдёт, как только появится', 3000); };
+  NardyNet.onBack = function () { if (isNet()) toast('Связь есть, ход ушёл'); };
 
   function pushTable(extra) {
     if (!isNet()) return;
@@ -920,7 +916,7 @@
     if (fresh && !st.winner && sheet.dataset.kind === 'result' && veil.classList.contains('show')) {
       closeSheet();
     }
-    if (t.toss && net.toss !== t.toss.n && !rows.length) {
+    if (t.toss && net.toss !== t.toss.n && !st.turnNo.w && !st.turnNo.b) {
       net.toss = t.toss.n;
       toast('Жеребьёвка: ' + t.toss.a + ' — ' + t.toss.b + '. Первыми ходят ' +
         (st.turn === 'w' ? 'белые' : 'чёрные'), 1800);
@@ -1445,7 +1441,7 @@
     keepScore(w, mars);
     quip(mars ? 'mars' : 'win', w, true);
     if (bump !== false) {
-      tally[w] += mars ? 2 : 1;
+      tally[w] += 1;                 /* марс — такое же одно очко */
       save();
       if (isNet()) pushTable({ status: 'done' });
     }
@@ -1460,7 +1456,7 @@
         '<div class="crown"><span class="disc ' + w + '"></span></div>' +
         '<h1 style="text-align:center">' + who + '</h1>' +
         '<p class="lede" style="text-align:center;margin-inline:auto">' +
-        (mars ? 'Марс — соперник не снял ни одной шашки. Два очка.' : 'Партия закрыта. Одно очко.') +
+        (mars ? 'Марс — соперник не снял ни одной шашки.' : 'Партия закрыта.') +
         '<br>Счёт матча ' + tally.w + ' : ' + tally.b + '.</p>' +
         '<div class="sheet-actions">' +
         (isNet()
@@ -1540,7 +1536,6 @@
     $(id).addEventListener('click', function () { if (!busy || S) profileSheet(); });
   });
   $('act-undo').addEventListener('click', function () { undo(); });
-  $('act-hint').addEventListener('click', hint);
   $('act-sound').addEventListener('click', function () {
     opts.sound = !opts.sound;
     save();
@@ -1622,6 +1617,7 @@
 
   window.NardyDebug = function () {
     return {
+      pos: S ? S.points.join(',') + '|' + S.off.w + ':' + S.off.b + '|' + S.turn : null,
       roll: S ? S.roll.slice() : null,
       reach: Object.keys(reach).map(Number),
       sel: sel, mode: opts.mode, code: net.code, seat: net.seat, ready: net.ready,
