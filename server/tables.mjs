@@ -8,65 +8,21 @@
    телефона нельзя — поэтому и подтверждать итог вдвоём больше
    не нужно.
 
+   Само ведение партии — в js/table.js, общем с браузером.
+   Здесь — только запросы, ключи мест и хранилище.
    Место за столом закреплено секретным ключом. Его получает
    только севший, соперник ключа не видит.
    ============================================================ */
-import { N, AI } from './rules.mjs';
+import { N, T } from './rules.mjs';
 
-const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TTL = 3 * 24 * 3600 * 1000;      /* стол без движения живёт трое суток */
-const LATE_MAX = 3;                    /* три просрочки подряд — поражение */
-
-/* Сроки. Меняются только в проверках, чтобы не ждать по минуте */
-export const LIMITS = {
-  move: 60 * 1000,                     /* время на ход, если стол с таймером */
-  grace: 1500,                         /* запас на дорогу по сети */
-  toss: 3000,                          /* пока идёт жеребьёвка, часы стоят */
-  wait: 25 * 1000                      /* сколько держим запрос в ожидании перемен */
-};
-
-/* ---------- мелочи ---------- */
-
-function rnd(n) {
-  /* равномерно: хвост байта, который на n не делится, отбрасываем */
-  const lim = 256 - (256 % n), b = new Uint8Array(1);
-  do crypto.getRandomValues(b); while (b[0] >= lim);
-  return b[0] % n;
-}
-const die = () => 1 + rnd(6);
-
-function code6() {
-  let s = '';
-  for (let i = 0; i < 6; i++) s += ABC[rnd(ABC.length)];
-  return s;
-}
+export const LIMITS = T.LIMITS;
+const { codeOf, person, settle } = T;
 
 function secret() {
   const b = new Uint8Array(16);
   crypto.getRandomValues(b);
   return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
-}
-
-function clean(s, n) {
-  return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, n);
-}
-
-function codeOf(v) {
-  const c = clean(v, 8).toUpperCase();
-  return /^[A-Z0-9]{4,8}$/.test(c) ? c : null;
-}
-
-/* Кто садится. Если вход через Telegram подтверждён — имя и фото
-   берём оттуда, а не из того, что прислал телефон. */
-function person(who, acc) {
-  who = who && typeof who === 'object' ? who : {};
-  const photo = clean(acc && acc.photo ? acc.photo : who.photo, 400);
-  return {
-    id: clean(who.id, 40) || 'p' + secret().slice(0, 8),
-    name: clean(acc ? acc.name : who.name, 24) || 'Игрок',
-    photo: /^https:\/\//.test(photo) ? photo : '',
-    acc: acc ? acc.id : null
-  };
 }
 
 function seatOf(t, key) {
@@ -91,106 +47,6 @@ function view(t, seen) {
   return out;
 }
 
-/* ---------- ход партии ---------- */
-
-function countSix(t, st) {
-  if (st.roll[0] === 6 && st.roll[1] === 6) t.six[st.turn] += 1;
-}
-
-function startGame(t, now) {
-  const st = N.create();
-  let a, b;
-  do { a = die(); b = die(); } while (a === b);
-  st.turn = a > b ? 'w' : 'b';
-  N.setRoll(st, die(), die());
-  t.game += 1;
-  t.gid = t.code + '-' + t.game + '-' + now.toString(36);
-  t.toss = { a, b, n: now, turn: st.turn };
-  t.state = st;
-  t.offer = null;
-  t.end = null;
-  t.last = null;
-  t.late = { w: 0, b: 0 };
-  t.six = { w: 0, b: 0 };
-  countSix(t, st);
-  t.deadline = t.opts.timer ? now + LIMITS.move + LIMITS.toss : 0;
-}
-
-/* Прогоняем присланные шашки через правила по одной. Ход обязан
-   быть полным: пока по правилам можно ходить, передавать нельзя. */
-function play(st, moves) {
-  const cur = N.clone(st);
-  for (const m of moves) {
-    if (cur.winner) return 'extra';
-    const ok = N.legalMoves(cur).find((x) => x.from === m.from && x.to === m.to && x.die === m.die);
-    if (!ok) return 'illegal';
-    N.applyTo(cur, ok);
-  }
-  if (!cur.winner && N.legalMoves(cur).length) return 'unfinished';
-  return cur;
-}
-
-function endGame(t, winner, why, now) {
-  const loser = N.opp(winner);
-  t.state.winner = winner;
-  t.tally[winner] += 1;                          /* марс — такое же одно очко */
-  t.end = {
-    winner, why, at: now, gid: t.gid,
-    mars: why === 'off' && t.state.off[loser] === 0,
-    six: { w: t.six.w, b: t.six.b },
-    shutout: false
-  };
-  t.deadline = 0;
-  t.offer = null;
-  if (t.opts.to && t.tally[winner] >= t.opts.to) {
-    t.match = { over: true, winner, score: { w: t.tally.w, b: t.tally.b } };
-    t.end.shutout = t.tally[loser] === 0;
-  }
-}
-
-/* После хода: либо победа, либо следующему игроку сразу бросаем кости */
-function advance(t, cur, by, moves, auto, now) {
-  t.last = { by, moves: moves.map((m) => ({ from: m.from, to: m.to, die: m.die })), auto: !!auto };
-  t.state = cur;
-  if (cur.winner) { endGame(t, cur.winner, 'off', now); return; }
-  N.endTurn(cur);
-  N.setRoll(cur, die(), die());
-  countSix(t, cur);
-  t.deadline = t.opts.timer ? now + LIMITS.move : 0;
-}
-
-/* Время вышло: за игрока ходит компьютер. Третья просрочка подряд — поражение. */
-function settle(t, now) {
-  if (t.status !== 'live' || !t.deadline || t.state.winner || now < t.deadline + LIMITS.grace) return false;
-  const p = t.state.turn;
-  t.late[p] += 1;
-  if (t.late[p] >= LATE_MAX) {
-    t.last = { by: p, moves: [], auto: true };
-    endGame(t, N.opp(p), 'time', now);
-    return true;
-  }
-  const path = AI.choose(N.clone(t.state), 'normal');
-  const cur = N.clone(t.state);
-  for (const m of path) N.applyTo(cur, m);
-  advance(t, cur, p, path, true, now);
-  return true;
-}
-
-function freshTable(code, opts, now) {
-  return {
-    v: 2, seq: 1, code, status: 'open', createdAt: now, updatedAt: now,
-    opts,
-    seats: { w: null, b: null },
-    keys: { w: null, b: null },
-    state: N.create(),
-    tally: { w: 0, b: 0 },
-    toss: null, gid: null, game: 0,
-    offer: null, declined: 0,
-    deadline: 0, late: { w: 0, b: 0 }, six: { w: 0, b: 0 },
-    last: null, end: null, match: null
-  };
-}
-
 /* ---------- запросы ---------- */
 
 function fail(status, error) { return { status, data: { error } }; }
@@ -209,15 +65,12 @@ async function reply(store, t, seat, status, error) {
 export async function create(store, body, acc) {
   const now = Date.now();
   const seat = body.seat === 'b' ? 'b' : 'w';
-  const o = body.opts && typeof body.opts === 'object' ? body.opts : {};
-  const opts = {
-    timer: !!o.timer,
-    to: Math.max(0, Math.min(21, Math.floor(Number(o.to) || 0)))
-  };
+  const opts = body.opts && typeof body.opts === 'object' ? body.opts : {};
   for (let i = 0; i < 6; i++) {
-    const code = code6();
+    const code = T.code6();
     const key = secret();
-    const t = freshTable(code, opts, now);
+    const t = T.freshTable(code, opts, now);
+    t.keys = { w: null, b: null };
     t.seats[seat] = person(body.who, acc);
     t.keys[seat] = key;
     const r = await store.update('table:' + code, (cur) => (cur ? undefined : t), TTL);
@@ -245,12 +98,8 @@ export async function sit(store, body, acc) {
     seat = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
     if (!seat) { why = 'full'; return; }
     key = secret();
-    t.seats[seat] = person(body.who, acc);
     t.keys[seat] = key;
-    if (t.seats.w && t.seats.b) {
-      t.status = 'live';
-      startGame(t, now);
-    }
+    T.seat(t, seat, person(body.who, acc), now);
     return bump(t, now);
   }, TTL);
   if (why === 'gone') return fail(404, 'gone');
@@ -262,8 +111,7 @@ export async function sit(store, body, acc) {
 
 /* Разовая проверка просрочки. Пишем, только если правда пора. */
 async function overdue(store, code, t) {
-  if (!t || t.status !== 'live' || !t.deadline || t.state.winner) return t;
-  if (Date.now() < t.deadline + LIMITS.grace) return t;
+  if (!t || !T.overdue(t, Date.now())) return t;
   let ended = false;
   const r = await store.update('table:' + code, (cur) => {
     ended = false;
@@ -321,7 +169,7 @@ async function act(store, body, fn) {
     const now = Date.now();
     const had = !!t.end;
     const late = settle(t, now);
-    why = fn(t, seat, now);
+    why = fn(t, seat, body, now);
     ended = !had && !!t.end;
     if (why && !late) return;               /* ничего не поменялось */
     return bump(t, now);
@@ -333,128 +181,22 @@ async function act(store, body, fn) {
   return reply(store, r.value, seat, status, why);
 }
 
-function movesOf(list) {
-  if (!Array.isArray(list) || list.length > 4) return null;
-  const out = [];
-  for (const m of list) {
-    if (!m || typeof m !== 'object') return null;
-    const from = Number(m.from), to = Number(m.to), d = Number(m.die);
-    if (!Number.isInteger(from) || from < 0 || from > 23) return null;
-    if (!Number.isInteger(to) || to < -1 || to > 23) return null;
-    if (!Number.isInteger(d) || d < 1 || d > 6) return null;
-    out.push({ from, to, die: d });
-  }
-  return out;
-}
-
-/* Ход целиком. Номер хода (game + ply) защищает от повтора: если ответ
-   потерялся и телефон прислал тот же ход ещё раз, второй раз он не пройдёт. */
-export function turn(store, body) {
-  const moves = movesOf(body.moves);
-  if (!moves) return fail(400, 'bad_moves');
-  return act(store, body, (t, seat, now) => {
-    const st = t.state;
-    if (t.status !== 'live' || st.winner || st.turn !== seat) return 'stale';
-    if (Number(body.game) !== t.game || Number(body.ply) !== st.turnNo[seat]) return 'stale';
-    const cur = play(st, moves);
-    if (typeof cur === 'string') return cur;
-    t.late[seat] = 0;
-    advance(t, cur, seat, moves, false, now);
-    return null;
-  });
-}
-
-/* Предложить переиграть — только посреди партии */
-export function offer(store, body) {
-  return act(store, body, (t, seat, now) => {
-    if (t.status !== 'live' || t.state.winner) return 'stale';
-    if (t.offer) return t.offer.by === seat ? null : 'busy';
-    t.offer = { by: seat, ts: now };
-    return null;
-  });
-}
-
-export function answer(store, body) {
-  return act(store, body, (t, seat, now) => {
-    if (!t.offer || t.offer.by === seat) return 'stale';
-    if (body.yes) startGame(t, now);            /* неоконченная партия в счёт не идёт */
-    else { t.offer = null; t.declined = now; }
-    return null;
-  });
-}
-
-/* Следующая партия после окончания. Жмут оба — начнётся одна. */
-export function again(store, body) {
-  return act(store, body, (t, seat, now) => {
-    if (t.status !== 'live') return 'stale';
-    if (!t.state.winner) return t.end ? null : 'stale';
-    if (t.match && t.match.over) { t.tally = { w: 0, b: 0 }; t.match = null; }
-    startGame(t, now);
-    return null;
-  });
-}
+export const turn = (store, body) => act(store, body, T.ask.turn);
+export const offer = (store, body) => act(store, body, T.ask.offer);
+export const answer = (store, body) => act(store, body, T.ask.answer);
+export const again = (store, body) => act(store, body, T.ask.again);
 
 /* ---------- итог партии в профили ---------- */
-
-export function blankUser(who) {
-  return {
-    id: who.id, name: who.name || 'Игрок', photo: who.photo || '', about: '',
-    w: 0, l: 0, mars: 0, marsLost: 0,
-    streak: 0, best: 0,
-    foes: {}, recent: [], badges: {},
-    created: Date.now(), updated: Date.now()
-  };
-}
-
-function badge(u, name, now) {
-  if (!u.badges[name]) u.badges[name] = now;
-}
 
 async function record(store, t) {
   const e = t.end;
   if (!e) return;
-  const sides = [e.winner, N.opp(e.winner)];
-  for (const p of sides) {
-    const me = t.seats[p], foe = t.seats[N.opp(p)];
-    if (!me || !me.acc || !foe) continue;
-    const win = p === e.winner;
+  for (const p of ['w', 'b']) {
+    const me = t.seats[p];
+    if (!me || !me.acc || !t.seats[N.opp(p)]) continue;
     await store.update('user:' + me.acc, (u) => {
-      u = u || blankUser({ id: me.acc, name: me.name, photo: me.photo });
-      u.recent = u.recent || [];
-      u.badges = u.badges || {};
-      if (u.recent.some((g) => g.gid === e.gid)) return;     /* уже записано */
-      const now = e.at;
-      if (win) { u.w += 1; if (e.mars) u.mars += 1; }
-      else { u.l += 1; if (e.mars) u.marsLost += 1; }
-      u.streak = win ? Math.max(0, u.streak || 0) + 1 : Math.min(0, u.streak || 0) - 1;
-      if (u.streak > (u.best || 0)) u.best = u.streak;
-
-      const fk = foe.acc || foe.id;
-      const f = u.foes[fk] || { name: foe.name, w: 0, l: 0 };
-      f.name = foe.name || f.name;
-      f.acc = foe.acc || null;
-      f.photo = foe.photo || f.photo || '';
-      if (win) f.w += 1; else f.l += 1;
-      f.games = f.w + f.l;
-      f.last = now;
-      u.foes[fk] = f;
-
-      u.recent.unshift({
-        gid: e.gid, at: now, win, mars: e.mars, why: e.why,
-        foe: { id: fk, name: foe.name, acc: foe.acc || null }
-      });
-      u.recent = u.recent.slice(0, 10);
-
-      if (win && e.mars) badge(u, 'mars1', now);
-      if (u.mars >= 10) badge(u, 'mars10', now);
-      if (e.six[p] >= 3) badge(u, 'six3', now);
-      if (win && e.shutout) badge(u, 'shutout', now);
-      if (u.w + u.l >= 100) badge(u, 'game100', now);
-
-      if (me.name) u.name = me.name;
-      if (me.photo && !u.custom) u.photo = me.photo;
-      u.updated = now;
-      return u;
+      u = u || T.blankUser({ id: me.acc, name: me.name, photo: me.photo }, e.at);
+      return T.recordInto(u, t, p) ? u : undefined;
     });
   }
 }

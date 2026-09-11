@@ -1,8 +1,9 @@
 /* ============================================================
-   Аккаунт. Если сервер поднят и игра открыта в Telegram —
-   вход настоящий: подпись initData проверяется на сервере,
-   профиль общий для всех устройств. Если сервера нет — играем
-   гостем, и вся статистика остаётся на этом устройстве.
+   Аккаунт. Игра открыта в Telegram — профиль общий для всех
+   устройств и лежит в базе Firebase под номером Telegram.
+   Если когда-нибудь появится свой сервер, вход пойдёт через
+   него с проверкой подписи Telegram. Открыта просто в браузере —
+   играем гостем, статистика остаётся на этом устройстве.
    ============================================================ */
 (function (global) {
   'use strict';
@@ -22,7 +23,10 @@
     } catch (e) {}
   }
 
-  function hasServer() { return !!API; }
+  /* База Firebase — главный путь; внутри артефакта её нет */
+  function fb() { return !API && !!global.NardyFB && NardyFB.ready() && !global.claude; }
+
+  function hasServer() { return !!API || fb(); }
   function signed() { return !!me; }
   function user() { return me; }
 
@@ -52,7 +56,13 @@
         return guest(name, String(e.message || e));
       });
     }
-    return Promise.resolve(guest(name, API ? 'вход только из Telegram' : ''));
+    var tg = fb() && global.NardyTG ? NardyTG.account() : null;
+    if (tg) {
+      me = { id: tg.id, name: tg.name, photo: tg.photo, guest: false };
+      save();
+      return Promise.resolve(me);
+    }
+    return Promise.resolve(guest(name, API || fb() ? 'вход только из Telegram' : ''));
   }
 
   function guest(name, why) {
@@ -77,8 +87,16 @@
     save();
   }
 
-  function profile(id) { return ask('/api/profile?id=' + encodeURIComponent(id || (me && me.id) || '')); }
-  function top() { return ask('/api/top'); }
+  function profile(id) {
+    id = id || (me && me.id) || '';
+    if (fb()) return NardyFB.profile(id).then(function (u) { return { user: u }; });
+    return ask('/api/profile?id=' + encodeURIComponent(id));
+  }
+
+  function top() {
+    if (fb()) return NardyFB.top().then(function (list) { return { top: list }; });
+    return ask('/api/top');
+  }
 
   global.NardyAccount = {
     api: function () { return API; },

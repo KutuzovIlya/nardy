@@ -1,7 +1,9 @@
 /* ============================================================
-   Сетевой стол. Главный путь — свой сервер (транспорт «srv»,
-   ниже): он ведёт партию сам. Пока адрес сервера не вписан,
-   работают два запасных транспорта под тем же интерфейсом:
+   Сетевой стол. Главный путь — Firebase (js/fb.js): стол лежит
+   в базе Google, партию ведут сами телефоны по общим правилам
+   js/table.js. Если когда-нибудь появится свой сервер (адрес
+   в js/account.js), стол поведёт он — транспорт «srv» ниже.
+   Запасные транспорты под тем же интерфейсом:
 
    • «db» — общее хранилище опубликованной страницы. Живая
      подписка, список открытых столов, атомарная посадка.
@@ -501,6 +503,9 @@
     }
     var api = global.NardyAccount && NardyAccount.api();
     if (api && typeof fetch === 'function') return Promise.resolve(srvTransport(api));
+    if (global.NardyFB && NardyFB.ready() && !global.claude) {
+      return Promise.resolve(NardyFB.transport(function () { return myId; }, function () { return myName; }));
+    }
     return Promise.resolve(relayIfPossible());
   }
 
@@ -535,7 +540,7 @@
     /* стол ведёт сервер — телефон ничего не пишет сам */
     authoritative: function () { return !!(T && T.authoritative); },
     /* время по часам сервера — для отсчёта хода */
-    now: function () { return Date.now() + skew; },
+    now: function () { return T && T.now ? T.now() : Date.now() + skew; },
     watchLobby: api('watchLobby'),
     create: api('create'),
     sit: api('sit'),

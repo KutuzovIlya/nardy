@@ -1305,7 +1305,7 @@
       var mine = NardyAccount.user();
       openSheet(
         '<h1>Рейтинг</h1>' +
-        '<p class="lede">Считается по разнице побед и поражений.</p>' +
+        '<p class="lede">По числу побед.</p>' +
         '<div class="field"><ul class="tables">' +
         (d.top.length ? d.top.map(function (u, i) {
           return '<li><b class="mono">' + (i + 1) + '</b><span>' + esc(u.name) +

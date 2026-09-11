@@ -59,6 +59,19 @@
     } catch (e) { return ''; }
   }
 
+  /* Кто открыл игру: номер в Telegram — ключ профиля */
+  function account() {
+    try {
+      var u = W && W.initDataUnsafe && W.initDataUnsafe.user;
+      if (!u || !u.id) return null;
+      return {
+        id: 'tg' + u.id,
+        name: (u.first_name || u.username || 'Игрок').slice(0, 24),
+        photo: u.photo_url || ''
+      };
+    } catch (e) { return null; }
+  }
+
   /* Подписанные данные о входе — их проверяет сервер */
   function initData() {
     try { return (W && W.initData) || ''; } catch (e) { return ''; }
@@ -110,6 +123,7 @@
     ready: ready,
     userName: userName,
     photo: photo,
+    account: account,
     initData: initData,
     startParam: startParam,
     buzz: buzz,

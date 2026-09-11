@@ -1202,6 +1202,381 @@ button { font: inherit; color: inherit; }
 </script>
 <script>
 /* ============================================================
+   Стол нард — правила ведения партии за столом: жеребьёвка,
+   ход целиком, часы, матч, итог. Чистые функции над объектом
+   стола, без сети и хранилища.
+
+   Один и тот же файл работает и в браузере (стол в Firebase),
+   и на сервере (server/tables.mjs), поэтому стол ведётся
+   одинаково, кто бы его ни вёл.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var N = global.Nardy, AI = global.NardyAI;
+  var ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var LATE_MAX = 3;                    /* три просрочки подряд — поражение */
+
+  /* Сроки. Меняются только в проверках, чтобы не ждать по минуте */
+  var LIMITS = {
+    move: 60 * 1000,                   /* время на ход, если стол с часами */
+    grace: 1500,                       /* запас на дорогу по сети */
+    toss: 3000,                        /* пока идёт жеребьёвка, часы стоят */
+    wait: 25 * 1000                    /* сколько сервер держит запрос в ожидании */
+  };
+
+  /* ---------- случай ---------- */
+
+  function rnd(n) {
+    /* равномерно: хвост байта, который на n не делится, отбрасываем */
+    var lim = 256 - (256 % n), b = new Uint8Array(1);
+    do global.crypto.getRandomValues(b); while (b[0] >= lim);
+    return b[0] % n;
+  }
+  function die() { return 1 + rnd(6); }
+
+  function code6() {
+    var s = '';
+    for (var i = 0; i < 6; i++) s += ABC[rnd(ABC.length)];
+    return s;
+  }
+
+  function clean(s, n) {
+    return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, n);
+  }
+
+  function codeOf(v) {
+    var c = clean(v, 8).toUpperCase();
+    return /^[A-Z0-9]{4,8}$/.test(c) ? c : null;
+  }
+
+  /* Кто садится. acc — аккаунт Telegram, если он известен */
+  function person(who, acc) {
+    who = who && typeof who === 'object' ? who : {};
+    var photo = clean(acc && acc.photo ? acc.photo : who.photo, 400);
+    return {
+      id: clean(who.id, 40) || 'p' + code6().toLowerCase(),
+      name: clean(acc && acc.name ? acc.name : who.name, 24) || 'Игрок',
+      photo: /^https:\/\//.test(photo) ? photo : '',
+      acc: acc ? acc.id : null
+    };
+  }
+
+  /* ---------- стол ---------- */
+
+  function freshTable(code, opts, now) {
+    return {
+      v: 2, seq: 1, code: code, status: 'open', createdAt: now, updatedAt: now,
+      opts: {
+        timer: !!(opts && opts.timer),
+        to: Math.max(0, Math.min(21, Math.floor(Number(opts && opts.to) || 0)))
+      },
+      seats: { w: null, b: null },
+      state: N.create(),
+      tally: { w: 0, b: 0 },
+      toss: null, gid: null, game: 0,
+      offer: null, declined: 0,
+      deadline: 0, late: { w: 0, b: 0 }, six: { w: 0, b: 0 },
+      last: null, end: null, match: null
+    };
+  }
+
+  /* Firebase не хранит пустые списки и null — после чтения
+     возвращаем столу привычный вид */
+  function normalize(t) {
+    if (!t) return t;
+    t.seats = t.seats || {};
+    t.seats.w = t.seats.w || null;
+    t.seats.b = t.seats.b || null;
+    t.tally = t.tally || { w: 0, b: 0 };
+    t.tally.w = t.tally.w || 0;
+    t.tally.b = t.tally.b || 0;
+    t.late = t.late || { w: 0, b: 0 };
+    t.late.w = t.late.w || 0;
+    t.late.b = t.late.b || 0;
+    t.six = t.six || { w: 0, b: 0 };
+    t.six.w = t.six.w || 0;
+    t.six.b = t.six.b || 0;
+    t.opts = t.opts || { timer: false, to: 0 };
+    t.opts.timer = !!t.opts.timer;
+    t.opts.to = t.opts.to || 0;
+    ['toss', 'gid', 'offer', 'last', 'end', 'match'].forEach(function (k) {
+      if (t[k] === undefined) t[k] = null;
+    });
+    t.game = t.game || 0;
+    t.declined = t.declined || 0;
+    t.deadline = t.deadline || 0;
+    if (t.last) t.last.moves = t.last.moves || [];
+    var st = t.state || N.create();
+    st.points = st.points || [];
+    for (var i = 0; i < 24; i++) st.points[i] = st.points[i] || 0;
+    st.off = st.off || { w: 0, b: 0 };
+    st.off.w = st.off.w || 0;
+    st.off.b = st.off.b || 0;
+    st.roll = st.roll || [];
+    st.dice = st.dice || [];
+    st.moves = st.moves || [];
+    st.turnNo = st.turnNo || { w: 0, b: 0 };
+    st.turnNo.w = st.turnNo.w || 0;
+    st.turnNo.b = st.turnNo.b || 0;
+    st.headUsed = st.headUsed || 0;
+    st.winner = st.winner || null;
+    t.state = st;
+    return t;
+  }
+
+  function countSix(t, st) {
+    if (st.roll[0] === 6 && st.roll[1] === 6) t.six[st.turn] += 1;
+  }
+
+  function startGame(t, now) {
+    var st = N.create(), a, b;
+    do { a = die(); b = die(); } while (a === b);
+    st.turn = a > b ? 'w' : 'b';
+    N.setRoll(st, die(), die());
+    t.game += 1;
+    t.gid = t.code + '-' + t.game + '-' + now.toString(36);
+    t.toss = { a: a, b: b, n: now, turn: st.turn };
+    t.state = st;
+    t.offer = null;
+    t.end = null;
+    t.last = null;
+    t.late = { w: 0, b: 0 };
+    t.six = { w: 0, b: 0 };
+    countSix(t, st);
+    t.deadline = t.opts.timer ? now + LIMITS.move + LIMITS.toss : 0;
+  }
+
+  /* Второй игрок сел — партия начинается */
+  function seat(t, p, who, now) {
+    t.seats[p] = who;
+    if (t.seats.w && t.seats.b && t.status === 'open') {
+      t.status = 'live';
+      startGame(t, now);
+    }
+  }
+
+  /* Прогоняем присланные шашки через правила по одной. Ход обязан
+     быть полным: пока по правилам можно ходить, передавать нельзя. */
+  function play(st, moves) {
+    var cur = N.clone(st), i, m, legal, ok, j;
+    for (i = 0; i < moves.length; i++) {
+      m = moves[i];
+      if (cur.winner) return 'extra';
+      legal = N.legalMoves(cur);
+      ok = null;
+      for (j = 0; j < legal.length; j++) {
+        if (legal[j].from === m.from && legal[j].to === m.to && legal[j].die === m.die) { ok = legal[j]; break; }
+      }
+      if (!ok) return 'illegal';
+      N.applyTo(cur, ok);
+    }
+    if (!cur.winner && N.legalMoves(cur).length) return 'unfinished';
+    return cur;
+  }
+
+  function endGame(t, winner, why, now) {
+    var loser = N.opp(winner);
+    t.state.winner = winner;
+    t.tally[winner] += 1;                          /* марс — такое же одно очко */
+    t.end = {
+      winner: winner, why: why, at: now, gid: t.gid,
+      mars: why === 'off' && t.state.off[loser] === 0,
+      six: { w: t.six.w, b: t.six.b },
+      shutout: false
+    };
+    t.deadline = 0;
+    t.offer = null;
+    if (t.opts.to && t.tally[winner] >= t.opts.to) {
+      t.match = { over: true, winner: winner, score: { w: t.tally.w, b: t.tally.b } };
+      t.end.shutout = t.tally[loser] === 0;
+    }
+  }
+
+  /* После хода: либо победа, либо следующему игроку сразу бросаем кости */
+  function advance(t, cur, by, moves, auto, now) {
+    t.last = {
+      by: by, auto: !!auto,
+      moves: moves.map(function (m) { return { from: m.from, to: m.to, die: m.die }; })
+    };
+    t.state = cur;
+    if (cur.winner) { endGame(t, cur.winner, 'off', now); return; }
+    N.endTurn(cur);
+    N.setRoll(cur, die(), die());
+    countSix(t, cur);
+    t.deadline = t.opts.timer ? now + LIMITS.move : 0;
+  }
+
+  function overdue(t, now) {
+    return t.status === 'live' && !!t.deadline && !t.state.winner && now >= t.deadline + LIMITS.grace;
+  }
+
+  /* Время вышло: за игрока ходит компьютер. Третья просрочка подряд — поражение. */
+  function settle(t, now) {
+    if (!overdue(t, now)) return false;
+    var p = t.state.turn;
+    t.late[p] += 1;
+    if (t.late[p] >= LATE_MAX) {
+      t.last = { by: p, moves: [], auto: true };
+      endGame(t, N.opp(p), 'time', now);
+      return true;
+    }
+    var path = AI.choose(N.clone(t.state), 'normal');
+    var cur = N.clone(t.state);
+    path.forEach(function (m) { N.applyTo(cur, m); });
+    advance(t, cur, p, path, true, now);
+    return true;
+  }
+
+  function movesOf(list) {
+    if (!Array.isArray(list) || list.length > 4) return null;
+    var out = [], i, m, from, to, d;
+    for (i = 0; i < list.length; i++) {
+      m = list[i];
+      if (!m || typeof m !== 'object') return null;
+      from = Number(m.from); to = Number(m.to); d = Number(m.die);
+      if (!isInt(from) || from < 0 || from > 23) return null;
+      if (!isInt(to) || to < -1 || to > 23) return null;
+      if (!isInt(d) || d < 1 || d > 6) return null;
+      out.push({ from: from, to: to, die: d });
+    }
+    return out;
+  }
+
+  function isInt(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x; }
+
+  /* ---------- просьбы игрока ----------
+     Каждая меняет стол на месте и возвращает null, если всё прошло,
+     или причину отказа. Номер стола (seq) поднимает тот, кто пишет. */
+
+  var ask = {
+    /* Ход целиком. Номер хода (game + ply) защищает от повтора: если ответ
+       потерялся и ход прислали ещё раз, второй раз он не пройдёт. */
+    turn: function (t, p, body, now) {
+      var st = t.state, moves = movesOf(body.moves);
+      if (!moves) return 'bad_moves';
+      if (t.status !== 'live' || st.winner || st.turn !== p) return 'stale';
+      if (Number(body.game) !== t.game || Number(body.ply) !== st.turnNo[p]) return 'stale';
+      var cur = play(st, moves);
+      if (typeof cur === 'string') return cur;
+      t.late[p] = 0;
+      advance(t, cur, p, moves, false, now);
+      return null;
+    },
+
+    /* Предложить переиграть — только посреди партии */
+    offer: function (t, p, body, now) {
+      if (t.status !== 'live' || t.state.winner) return 'stale';
+      if (t.offer) return t.offer.by === p ? null : 'busy';
+      t.offer = { by: p, ts: now };
+      return null;
+    },
+
+    answer: function (t, p, body, now) {
+      if (!t.offer || t.offer.by === p) return 'stale';
+      if (body.yes) startGame(t, now);            /* неоконченная партия в счёт не идёт */
+      else { t.offer = null; t.declined = now; }
+      return null;
+    },
+
+    /* Следующая партия после окончания. Жмут оба — начнётся одна. */
+    again: function (t, p, body, now) {
+      if (t.status !== 'live') return 'stale';
+      if (!t.state.winner) return t.end ? null : 'stale';
+      if (t.match && t.match.over) { t.tally = { w: 0, b: 0 }; t.match = null; }
+      startGame(t, now);
+      return null;
+    }
+  };
+
+  /* ---------- итог партии в профиль ---------- */
+
+  function blankUser(who, now) {
+    return {
+      id: who.id, name: who.name || 'Игрок', photo: who.photo || '', about: '',
+      w: 0, l: 0, mars: 0, marsLost: 0,
+      streak: 0, best: 0,
+      foes: {}, recent: [], badges: {},
+      created: now, updated: now
+    };
+  }
+
+  /* Вписать исход партии в профиль игрока за местом p.
+     Возвращает false, если эта партия там уже записана. */
+  function recordInto(u, t, p) {
+    var e = t.end, me = t.seats[p], foe = t.seats[N.opp(p)];
+    var win = p === e.winner, now = e.at, i;
+    u.recent = u.recent || [];
+    u.badges = u.badges || {};
+    u.foes = u.foes || {};
+    for (i = 0; i < u.recent.length; i++) if (u.recent[i].gid === e.gid) return false;
+    u.w = u.w || 0; u.l = u.l || 0; u.mars = u.mars || 0; u.marsLost = u.marsLost || 0;
+    if (win) { u.w += 1; if (e.mars) u.mars += 1; }
+    else { u.l += 1; if (e.mars) u.marsLost += 1; }
+    u.streak = win ? Math.max(0, u.streak || 0) + 1 : Math.min(0, u.streak || 0) - 1;
+    if (u.streak > (u.best || 0)) u.best = u.streak;
+
+    var fk = foe.acc || foe.id;
+    var f = u.foes[fk] || { name: foe.name, w: 0, l: 0 };
+    f.name = foe.name || f.name;
+    f.acc = foe.acc || null;
+    f.photo = foe.photo || f.photo || '';
+    if (win) f.w += 1; else f.l += 1;
+    f.games = f.w + f.l;
+    f.last = now;
+    u.foes[fk] = f;
+
+    u.recent.unshift({
+      gid: e.gid, at: now, win: win, mars: !!e.mars, why: e.why,
+      foe: { id: fk, name: foe.name, acc: foe.acc || null }
+    });
+    u.recent = u.recent.slice(0, 10);
+
+    function badge(name) { if (!u.badges[name]) u.badges[name] = now; }
+    if (win && e.mars) badge('mars1');
+    if (u.mars >= 10) badge('mars10');
+    if (e.six && e.six[p] >= 3) badge('six3');
+    if (win && e.shutout) badge('shutout');
+    if (u.w + u.l >= 100) badge('game100');
+
+    if (me.name) u.name = me.name;
+    if (me.photo && !u.custom) u.photo = me.photo;
+    u.updated = now;
+    return true;
+  }
+
+  /* Профиль для показа: соперники списком, трое частых — братишки */
+  function pub(u) {
+    var foes = [], id, f;
+    for (id in u.foes || {}) {
+      f = u.foes[id];
+      foes.push({
+        id: id, acc: f.acc || null, name: f.name, photo: f.photo || '',
+        w: f.w || 0, l: f.l || 0, games: f.games || ((f.w || 0) + (f.l || 0)), last: f.last || 0
+      });
+    }
+    foes.sort(function (a, b) { return b.games - a.games || b.last - a.last; });
+    return {
+      id: u.id, name: u.name, photo: u.photo || '', about: u.about || '',
+      w: u.w || 0, l: u.l || 0, mars: u.mars || 0, marsLost: u.marsLost || 0,
+      streak: u.streak || 0, best: u.best || 0,
+      recent: u.recent || [], badges: u.badges || {},
+      foes: foes.slice(0, 20),
+      bros: foes.filter(function (x) { return x.games >= 3; }).slice(0, 3).map(function (x) { return x.id; })
+    };
+  }
+
+  global.NardyTable = {
+    LIMITS: LIMITS,
+    die: die, code6: code6, clean: clean, codeOf: codeOf, person: person,
+    freshTable: freshTable, normalize: normalize, seat: seat, startGame: startGame,
+    overdue: overdue, settle: settle, ask: ask,
+    blankUser: blankUser, recordInto: recordInto, pub: pub
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/* ============================================================
    Доска: резной орех, костяные вставки, шашки и кости рисуются
    на canvas и раздаются интерфейсу картинками.
 
@@ -2526,10 +2901,11 @@ button { font: inherit; color: inherit; }
 </script>
 <script>
 /* ============================================================
-   Аккаунт. Если сервер поднят и игра открыта в Telegram —
-   вход настоящий: подпись initData проверяется на сервере,
-   профиль общий для всех устройств. Если сервера нет — играем
-   гостем, и вся статистика остаётся на этом устройстве.
+   Аккаунт. Игра открыта в Telegram — профиль общий для всех
+   устройств и лежит в базе Firebase под номером Telegram.
+   Если когда-нибудь появится свой сервер, вход пойдёт через
+   него с проверкой подписи Telegram. Открыта просто в браузере —
+   играем гостем, статистика остаётся на этом устройстве.
    ============================================================ */
 (function (global) {
   'use strict';
@@ -2549,7 +2925,10 @@ button { font: inherit; color: inherit; }
     } catch (e) {}
   }
 
-  function hasServer() { return !!API; }
+  /* База Firebase — главный путь; внутри артефакта её нет */
+  function fb() { return !API && !!global.NardyFB && NardyFB.ready() && !global.claude; }
+
+  function hasServer() { return !!API || fb(); }
   function signed() { return !!me; }
   function user() { return me; }
 
@@ -2579,7 +2958,13 @@ button { font: inherit; color: inherit; }
         return guest(name, String(e.message || e));
       });
     }
-    return Promise.resolve(guest(name, API ? 'вход только из Telegram' : ''));
+    var tg = fb() && global.NardyTG ? NardyTG.account() : null;
+    if (tg) {
+      me = { id: tg.id, name: tg.name, photo: tg.photo, guest: false };
+      save();
+      return Promise.resolve(me);
+    }
+    return Promise.resolve(guest(name, API || fb() ? 'вход только из Telegram' : ''));
   }
 
   function guest(name, why) {
@@ -2604,8 +2989,16 @@ button { font: inherit; color: inherit; }
     save();
   }
 
-  function profile(id) { return ask('/api/profile?id=' + encodeURIComponent(id || (me && me.id) || '')); }
-  function top() { return ask('/api/top'); }
+  function profile(id) {
+    id = id || (me && me.id) || '';
+    if (fb()) return NardyFB.profile(id).then(function (u) { return { user: u }; });
+    return ask('/api/profile?id=' + encodeURIComponent(id));
+  }
+
+  function top() {
+    if (fb()) return NardyFB.top().then(function (list) { return { top: list }; });
+    return ask('/api/top');
+  }
 
   global.NardyAccount = {
     api: function () { return API; },
@@ -2677,6 +3070,19 @@ button { font: inherit; color: inherit; }
     } catch (e) { return ''; }
   }
 
+  /* Кто открыл игру: номер в Telegram — ключ профиля */
+  function account() {
+    try {
+      var u = W && W.initDataUnsafe && W.initDataUnsafe.user;
+      if (!u || !u.id) return null;
+      return {
+        id: 'tg' + u.id,
+        name: (u.first_name || u.username || 'Игрок').slice(0, 24),
+        photo: u.photo_url || ''
+      };
+    } catch (e) { return null; }
+  }
+
   /* Подписанные данные о входе — их проверяет сервер */
   function initData() {
     try { return (W && W.initData) || ''; } catch (e) { return ''; }
@@ -2728,6 +3134,7 @@ button { font: inherit; color: inherit; }
     ready: ready,
     userName: userName,
     photo: photo,
+    account: account,
     initData: initData,
     startParam: startParam,
     buzz: buzz,
@@ -2740,9 +3147,461 @@ button { font: inherit; color: inherit; }
 </script>
 <script>
 /* ============================================================
-   Сетевой стол. Главный путь — свой сервер (транспорт «srv»,
-   ниже): он ведёт партию сам. Пока адрес сервера не вписан,
-   работают два запасных транспорта под тем же интерфейсом:
+   Firebase: столы и профили без своего сервера.
+
+   Google бесплатно держит базу (Realtime Database) и пускает
+   игроков анонимным входом — без регистрации и без карты,
+   из России без VPN. Партию ведёт сам телефон теми же
+   правилами, что и сервер (js/table.js). База следит за
+   порядком (правила — в firebase.rules.json):
+     • за стол пишут только двое севших;
+     • каждая запись поднимает номер стола ровно на один —
+       опоздавшая копия не затрёт свежую, а тот, кто опоздал,
+       перечитывает стол и пробует снова.
+
+   Работаем через обычные HTTP-запросы и поток событий
+   (EventSource) — без тяжёлой библиотеки Firebase.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var CFG = {
+    key: 'AIzaSyA8NB_PgCVCEWaqRVaG2Ei3pHVWhfpL3yY',      /* публичный ключ веб-приложения, не секрет */
+    db: 'https://nardy-577d6-default-rtdb.europe-west1.firebasedatabase.app'
+  };
+  var T = global.NardyTable, N = global.Nardy;
+
+  function clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+
+  function fail(status, message) {
+    var e = new Error(message || ('http ' + status));
+    e.status = status;
+    return e;
+  }
+
+  function json(r) {
+    return r.json().then(function (d) {
+      if (!r.ok) throw fail(r.status, d && d.error && (d.error.message || d.error));
+      return d;
+    }, function () { throw fail(r.status); });
+  }
+
+  /* ---------- анонимный вход ----------
+     Номер игрока (uid) живёт в памяти телефона и не меняется между
+     запусками. Пропуск (token) действует час и обновляется сам. */
+
+  var sess = null, pending = null;
+  try { sess = JSON.parse(localStorage.getItem('nardy.fb') || 'null'); } catch (e) { sess = null; }
+
+  function keepSess() {
+    try { localStorage.setItem('nardy.fb', JSON.stringify({ uid: sess.uid, rt: sess.rt })); } catch (e) {}
+  }
+
+  function signUp() {
+    return fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + CFG.key, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ returnSecureToken: true })
+    }).then(json).then(function (d) {
+      sess = { uid: d.localId, rt: d.refreshToken, tok: d.idToken, exp: Date.now() + (Number(d.expiresIn) - 120) * 1000 };
+      keepSess();
+      return sess.tok;
+    });
+  }
+
+  function refresh() {
+    return fetch('https://securetoken.googleapis.com/v1/token?key=' + CFG.key, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(sess.rt)
+    }).then(json).then(function (d) {
+      sess = { uid: d.user_id, rt: d.refresh_token, tok: d.id_token, exp: Date.now() + (Number(d.expires_in) - 120) * 1000 };
+      keepSess();
+      return sess.tok;
+    });
+  }
+
+  function token() {
+    if (sess && sess.tok && Date.now() < sess.exp) return Promise.resolve(sess.tok);
+    if (pending) return pending;
+    var p = sess && sess.rt
+      ? refresh().then(null, function (e) { if (e.status === 400) return signUp(); throw e; })
+      : signUp();
+    pending = p.then(function (t) { pending = null; return t; }, function (e) { pending = null; throw e; });
+    return pending;
+  }
+
+  function uid() { return sess ? sess.uid : null; }
+
+  /* ---------- база ---------- */
+
+  /* Всё игровое лежит в папке v1: поменяется устройство данных —
+     заведём v2, и старые записи не помешают новым */
+  function url(path, tok, query) {
+    return CFG.db + '/v1/' + path + '.json?auth=' + encodeURIComponent(tok) + (query || '');
+  }
+
+  function get(path, query) {
+    return token().then(function (tok) {
+      return fetch(url(path, tok, query), { cache: 'no-store' }).then(json);
+    });
+  }
+
+  function put(path, val) {
+    return token().then(function (tok) {
+      return fetch(url(path, tok), { method: 'PUT', body: JSON.stringify(val) }).then(json);
+    });
+  }
+
+  /* Прочитать — изменить — записать. field — номер записи ('seq' у стола,
+     'rev' у профиля): база примет запись, только если он вырос ровно на один.
+     fn получает копию и возвращает новое значение или undefined — «не менять». */
+  function update(path, fn, field) {
+    var tries = 0;
+    function once() {
+      return get(path).then(function (cur) {
+        var next = fn(cur == null ? null : clone(cur));
+        if (next === undefined) return { value: cur, changed: false };
+        next[field] = (cur ? cur[field] || 0 : 0) + 1;
+        return put(path, next).then(function () {
+          return { value: next, changed: true };
+        }, function (e) {
+          if (e.status === 401 && ++tries < 6) return once();     /* кто-то записал раньше нас */
+          throw e;
+        });
+      });
+    }
+    return once();
+  }
+
+  /* Поток событий: база сама говорит, что запись изменилась. Сами
+     изменения не собираем по кусочкам — просто перечитываем целиком,
+     так надёжнее. Пропуск истёк — переподключаемся с новым. */
+  function stream(path, onChange) {
+    var es = null, dead = false, timer = null, retry = 0;
+
+    function open() {
+      if (dead) return;
+      token().then(function (tok) {
+        if (dead) return;
+        es = new EventSource(url(path, tok));
+        es.addEventListener('put', ping);
+        es.addEventListener('patch', ping);
+        es.addEventListener('auth_revoked', again);
+        es.addEventListener('cancel', again);
+        es.onerror = function () { if (es && es.readyState === 2) again(); };
+      }, later);
+    }
+    function ping() { retry = 0; onChange(); }
+    function again() {
+      if (es) es.close();
+      es = null;
+      if (sess) sess.exp = 0;              /* на всякий случай берём свежий пропуск */
+      later();
+    }
+    function later() {
+      if (dead) return;
+      clearTimeout(timer);
+      timer = setTimeout(open, Math.min(10000, 500 * Math.pow(2, retry++)));
+    }
+
+    open();
+    return {
+      close: function () { dead = true; clearTimeout(timer); if (es) es.close(); es = null; },
+      kick: function () { if (es) es.close(); es = null; retry = 0; open(); }
+    };
+  }
+
+  /* ---------- время ----------
+     Часы у телефонов расходятся. Меряем их по часам базы: при каждой
+     отметке «я здесь» база вписывает своё время и возвращает его. */
+
+  var skew = 0;
+  function now() { return Math.round(Date.now() + skew); }
+
+  /* ---------- профили ---------- */
+
+  function acc() { return global.NardyTG ? NardyTG.account() : null; }
+
+  function record(t) {
+    var e = t.end;
+    if (!e) return Promise.resolve();
+    return ['w', 'b'].reduce(function (chain, p) {
+      var me = t.seats[p];
+      if (!me || !me.acc || !t.seats[N.opp(p)]) return chain;
+      return chain.then(function () {
+        return update('users/' + me.acc, function (u) {
+          u = u || T.blankUser({ id: me.acc, name: me.name, photo: me.photo }, e.at);
+          return T.recordInto(u, t, p) ? u : undefined;
+        }, 'rev');
+      }).then(null, function () {});
+    }, Promise.resolve());
+  }
+
+  function profile(id) {
+    return get('users/' + encodeURIComponent(id)).then(function (u) { return u ? T.pub(u) : null; });
+  }
+
+  function top() {
+    return get('users', '&orderBy=%22w%22&limitToLast=50').then(function (all) {
+      var list = [], k;
+      for (k in all || {}) {
+        list.push({ id: k, name: all[k].name, photo: all[k].photo || '', w: all[k].w || 0, l: all[k].l || 0 });
+      }
+      list.sort(function (a, b) { return b.w - a.w || a.l - b.l; });
+      return list;
+    });
+  }
+
+  /* ---------- стол ---------- */
+
+  function seatOf(t) {
+    if (!t || !t.uids || !uid()) return null;
+    if (t.uids.w === uid()) return 'w';
+    if (t.uids.b === uid()) return 'b';
+    return null;
+  }
+
+  /* Что видит игра: стол, кто был в сети и время по часам базы */
+  var seenCache = {};
+  function view(t) {
+    var out = clone(T.normalize(t));
+    delete out.uids;
+    out.seen = seenCache[t.code] || { w: 0, b: 0 };
+    out.now = now();
+    return out;
+  }
+
+  function transport(myId, myName) {
+    var cur = null, clockTimer = null;
+
+    function who(w) {
+      return { id: myId(), name: (w && w.name) || myName() || 'Игрок', photo: (w && w.photo) || '' };
+    }
+
+    function create(body) {
+      var p = body.seat === 'b' ? 'b' : 'w', tries = 0;
+      function attempt() {
+        var code = T.code6(), t = T.freshTable(code, body.opts, now());
+        t.uids = {};
+        t.uids[p] = uid();
+        t.seats[p] = T.person(who(body.who), acc());
+        return put('tables/' + code, t).then(function () {
+          cur = code;
+          return { ok: true, seat: p, table: view(t), code: code };
+        }, function (e) {
+          if (e.status === 401 && ++tries < 5) return attempt();   /* такой код уже занят */
+          throw e;
+        });
+      }
+      return token().then(attempt);
+    }
+
+    function sit(code, want, w) {
+      var p = null, why = null;
+      return token().then(function () {
+        return update('tables/' + code, function (t) {
+          p = why = null;
+          if (!t) { why = 'gone'; return; }
+          T.normalize(t);
+          t.uids = t.uids || {};
+          p = seatOf(t);
+          if (p) return;                                   /* уже сидим — просто вернуться */
+          p = !t.seats.w ? 'w' : (!t.seats.b ? 'b' : null);
+          if (!p) { why = 'full'; return; }
+          t.uids[p] = uid();
+          t.updatedAt = now();
+          T.seat(t, p, T.person(who(w), acc()), now());
+          return t;
+        }, 'seq');
+      }).then(function (r) {
+        if (why) return { ok: false, why: why };
+        cur = code;
+        return { ok: true, seat: p, table: view(r.value), code: code };
+      });
+    }
+
+    /* Просьба игрока: сперва отработать просрочку, потом саму просьбу.
+       Партия кончилась на этой записи — пишем итог в профили. */
+    function act(name, body) {
+      var why = null, ended = false;
+      return update('tables/' + cur, function (t) {
+        why = null;
+        ended = false;
+        if (!t) { why = 'gone'; return; }
+        T.normalize(t);
+        var p = seatOf(t);
+        if (!p) { why = 'not_seated'; return; }
+        var at = now(), had = !!t.end;
+        var late = T.settle(t, at);
+        why = T.ask[name](t, p, body, at);
+        ended = !had && !!t.end;
+        if (why && !late) return;
+        t.updatedAt = at;
+        return t;
+      }, 'seq').then(function (r) {
+        if (r.changed && ended) record(r.value);
+        return r.value ? { table: view(r.value), error: why } : { error: why || 'gone' };
+      }, function (e) {
+        if (!e || !e.status) return { error: 'net' };           /* нет связи — повторим */
+        /* база отказала всерьёз — отдаём игре стол как есть, пусть выровняется */
+        return get('tables/' + cur).then(function (t) {
+          return { table: t ? view(t) : null, error: 'denied' };
+        }, function () { return { error: 'net' }; });
+      });
+    }
+
+    /* Просьбы идут по одной и повторяются, пока связь не вернётся */
+    var queue = [], busy = false, tries = 0;
+    function pump() {
+      if (busy || !queue.length) return;
+      busy = true;
+      var job = queue[0];
+      act(job.name, job.body).then(function (d) {
+        busy = false;
+        if (d.error === 'net') {
+          tries++;
+          if (tries === 1 && global.NardyNet && NardyNet.onLost) NardyNet.onLost();
+          setTimeout(pump, Math.min(10000, 600 * Math.pow(2, tries - 1)));
+          return;
+        }
+        queue.shift();
+        if (tries && global.NardyNet && NardyNet.onBack) NardyNet.onBack();
+        tries = 0;
+        job.ok(d);
+        pump();
+      });
+    }
+    function ask(name, body) {
+      return new Promise(function (ok) { queue.push({ name: name, body: body || {}, ok: ok }); pump(); });
+    }
+
+    /* Кто в сети: раз в 20 секунд отмечаемся сами и смотрим на соперника */
+    function heartbeat(code, p) {
+      if (!p) return Promise.resolve();
+      var sent = Date.now();
+      return put('seen/' + code + '/' + p, { '.sv': 'timestamp' }).then(function (ts) {
+        if (typeof ts === 'number') skew = ts - (sent + Date.now()) / 2;
+        return get('seen/' + code);
+      }).then(function (s) {
+        seenCache[code] = { w: (s && s.w) || 0, b: (s && s.b) || 0 };
+      }, function () {});
+    }
+
+    /* Сходить за опоздавшего, когда выйдет срок. Караулят оба телефона,
+       запишет тот, кто успеет, — второй увидит, что уже сделано. */
+    function guard(t) {
+      clearTimeout(clockTimer);
+      if (!t || t.status !== 'live' || !t.deadline || t.state.winner) return;
+      var ms = t.deadline + T.LIMITS.grace + 200 - now();
+      clockTimer = setTimeout(function () {
+        var ended = false;
+        update('tables/' + t.code, function (x) {
+          ended = false;
+          if (!x) return;
+          T.normalize(x);
+          if (!seatOf(x)) return;
+          var had = !!x.end;
+          if (!T.settle(x, now())) return;
+          ended = !had && !!x.end;
+          x.updatedAt = now();
+          return x;
+        }, 'seq').then(function (r) { if (r.changed && ended) record(r.value); }, function () {});
+      }, Math.max(0, ms));
+    }
+
+    return {
+      kind: 'fb',
+      hasLobby: false,
+      hasPresence: true,
+      authoritative: true,
+
+      watchLobby: function (cb) { cb([]); return function () {}; },
+      create: create,
+      sit: sit,
+
+      watchTable: function (code, cb, onErr) {
+        cur = code;
+        var dead = false, busyRead = false, again = false, fails = 0, beat = null, s = null, mine = null;
+
+        function read() {
+          if (dead) return;
+          if (busyRead) { again = true; return; }
+          busyRead = true;
+          get('tables/' + code).then(function (t) {
+            busyRead = false;
+            if (dead) return;
+            fails = 0;
+            if (!t) { dead = true; cb(null); return; }
+            T.normalize(t);
+            var first = !mine;
+            mine = seatOf(t);
+            if (first && mine) heartbeat(code, mine);        /* «в сети» — сразу, не через 20 секунд */
+            guard(t);
+            cb(view(t));
+            if (again) { again = false; read(); }
+          }, function (e) {
+            busyRead = false;
+            if (dead) return;
+            if (++fails === 3 && onErr) onErr(e);
+            setTimeout(read, Math.min(8000, 500 * Math.pow(2, fails)));
+          });
+        }
+
+        function beatNow() {
+          heartbeat(code, mine).then(function () { if (!dead) read(); });
+        }
+
+        s = stream('tables/' + code, read);
+        beatNow();
+        beat = setInterval(beatNow, 20000);
+
+        /* из фона iOS мог оборвать поток молча — переподключаемся сразу */
+        function wake() { if (!document.hidden && !dead) { s.kick(); beatNow(); } }
+        document.addEventListener('visibilitychange', wake);
+
+        return function () {
+          dead = true;
+          clearInterval(beat);
+          clearTimeout(clockTimer);
+          document.removeEventListener('visibilitychange', wake);
+          s.close();
+        };
+      },
+
+      write: function () { return Promise.resolve(); },
+
+      peek: function (code) {
+        return get('tables/' + code).then(function (t) { return t ? view(t) : null; });
+      },
+
+      turn: function (game, ply, moves) { return ask('turn', { game: game, ply: ply, moves: moves }); },
+      offer: function () { return ask('offer'); },
+      answer: function (yes) { return ask('answer', { yes: !!yes }); },
+      again: function () { return ask('again'); },
+
+      now: now,
+      here: function () {},
+      watchPeers: function () { return function () {}; }
+    };
+  }
+
+  global.NardyFB = {
+    transport: transport,
+    profile: profile,
+    top: top,
+    now: now,
+    ready: function () { return typeof fetch === 'function' && typeof EventSource === 'function'; }
+  };
+})(window);
+</script>
+<script>
+/* ============================================================
+   Сетевой стол. Главный путь — Firebase (js/fb.js): стол лежит
+   в базе Google, партию ведут сами телефоны по общим правилам
+   js/table.js. Если когда-нибудь появится свой сервер (адрес
+   в js/account.js), стол поведёт он — транспорт «srv» ниже.
+   Запасные транспорты под тем же интерфейсом:
 
    • «db» — общее хранилище опубликованной страницы. Живая
      подписка, список открытых столов, атомарная посадка.
@@ -3242,6 +4101,9 @@ button { font: inherit; color: inherit; }
     }
     var api = global.NardyAccount && NardyAccount.api();
     if (api && typeof fetch === 'function') return Promise.resolve(srvTransport(api));
+    if (global.NardyFB && NardyFB.ready() && !global.claude) {
+      return Promise.resolve(NardyFB.transport(function () { return myId; }, function () { return myName; }));
+    }
     return Promise.resolve(relayIfPossible());
   }
 
@@ -3276,7 +4138,7 @@ button { font: inherit; color: inherit; }
     /* стол ведёт сервер — телефон ничего не пишет сам */
     authoritative: function () { return !!(T && T.authoritative); },
     /* время по часам сервера — для отсчёта хода */
-    now: function () { return Date.now() + skew; },
+    now: function () { return T && T.now ? T.now() : Date.now() + skew; },
     watchLobby: api('watchLobby'),
     create: api('create'),
     sit: api('sit'),
@@ -4601,7 +5463,7 @@ button { font: inherit; color: inherit; }
       var mine = NardyAccount.user();
       openSheet(
         '<h1>Рейтинг</h1>' +
-        '<p class="lede">Считается по разнице побед и поражений.</p>' +
+        '<p class="lede">По числу побед.</p>' +
         '<div class="field"><ul class="tables">' +
         (d.top.length ? d.top.map(function (u, i) {
           return '<li><b class="mono">' + (i + 1) + '</b><span>' + esc(u.name) +

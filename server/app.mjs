@@ -7,6 +7,7 @@
    Хранилище передаётся снаружи: {get, set, update, wait, list}.
    ============================================================ */
 import * as tables from './tables.mjs';
+import { T } from './rules.mjs';
 
 var enc = new TextEncoder();
 var MAX_BODY = 32 * 1024;
@@ -126,7 +127,7 @@ async function route(req, store, cfg, cors) {
     var who = await checkInitData(body.initData, cfg.botToken, 86400);
     if (!who) return json({ error: 'bad_init_data' }, 401, cors);
     var r = await store.update('user:' + who.id, function (u) {
-      u = u || tables.blankUser(who);
+      u = u || T.blankUser(who, Date.now());
       u.name = who.name || u.name;
       if (who.photo && !u.custom) u.photo = who.photo;
       u.seen = Date.now();
@@ -154,22 +155,4 @@ async function route(req, store, cfg, cors) {
   return json({ error: 'not_found' }, 404, cors);
 }
 
-function pub(u) {
-  var foes = [], id;
-  for (id in u.foes || {}) {
-    var f = u.foes[id];
-    foes.push({
-      id: id, acc: f.acc || null, name: f.name, photo: f.photo || '',
-      w: f.w, l: f.l, games: f.games || (f.w + f.l), last: f.last || 0
-    });
-  }
-  foes.sort(function (a, b) { return b.games - a.games || b.last - a.last; });
-  return {
-    id: u.id, name: u.name, photo: u.photo, about: u.about || '',
-    w: u.w, l: u.l, mars: u.mars, marsLost: u.marsLost,
-    streak: u.streak || 0, best: u.best || 0,
-    recent: u.recent || [], badges: u.badges || {},
-    foes: foes.slice(0, 20),
-    bros: foes.filter(function (f) { return f.games >= 3; }).slice(0, 3).map(function (f) { return f.id; })
-  };
-}
+function pub(u) { return T.pub(u); }
