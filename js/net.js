@@ -1,5 +1,7 @@
 /* ============================================================
-   Сетевой стол. Два транспорта под одним интерфейсом:
+   Сетевой стол. Главный путь — свой сервер (транспорт «srv»,
+   ниже): он ведёт партию сам. Пока адрес сервера не вписан,
+   работают два запасных транспорта под тем же интерфейсом:
 
    • «db» — общее хранилище опубликованной страницы. Живая
      подписка, список открытых столов, атомарная посадка.
@@ -311,7 +313,175 @@
     };
   }
 
+  /* ---------- транспорт 3: свой сервер ---------- */
+
+  /* Стол ведёт сервер: он бросает кости, проверяет ходы, считает время.
+     Телефон только просит — «вот мой ход», «давай заново» — и ждёт
+     перемен. Место за столом держится секретным ключом стола. */
+  function srvTransport(api) {
+    var keys = {};
+    try { keys = JSON.parse(localStorage.getItem('nardy.keys') || '{}') || {}; } catch (e) { keys = {}; }
+
+    function keep(code, key) {
+      if (!code || !key) return;
+      delete keys[code];
+      keys[code] = key;
+      var list = Object.keys(keys);
+      while (list.length > 10) delete keys[list.shift()];
+      try { localStorage.setItem('nardy.keys', JSON.stringify(keys)); } catch (e) {}
+    }
+
+    /* JSON уходит обычным текстом: так браузер не шлёт перед каждым
+       ходом предварительный запрос, и ход доходит вдвое быстрее. */
+    function post(path, body, signal) {
+      return fetch(api + path, { method: 'POST', body: JSON.stringify(body), signal: signal, cache: 'no-store' })
+        .then(function (r) {
+          return r.json().then(function (d) {
+            if (r.status >= 500) { var e = new Error(d.error || 'server'); e.status = r.status; throw e; }
+            d.status = r.status;
+            if (d.table) clock(d.table.now);
+            return d;
+          }, function () {
+            var e = new Error('bad answer'); e.status = r.status; throw e;
+          });
+        });
+    }
+
+    function clock(now) { if (now) skew = now - Date.now(); }
+
+    function who(w) {
+      return {
+        id: myId,
+        name: (w && w.name) || myName || 'Игрок',
+        photo: (w && w.photo) || ''
+      };
+    }
+    function tg() { return global.NardyTG ? NardyTG.initData() : ''; }
+
+    /* Просьбы игрока идут по одной и повторяются, пока связь не вернётся.
+       Ответ с ошибкой — тоже ответ: в нём свежий стол, по нему и выравниваемся. */
+    var queue = [], sending = false, tries = 0;
+
+    function pump() {
+      if (sending || !queue.length) return;
+      sending = true;
+      var job = queue[0];
+      post(job.path, job.body).then(function (d) {
+        sending = false;
+        queue.shift();
+        if (tries && global.NardyNet && NardyNet.onBack) NardyNet.onBack();
+        tries = 0;
+        job.ok(d);
+        pump();
+      }, function (e) {
+        sending = false;
+        if (e && e.status >= 500 && tries >= 4) { queue.shift(); job.ok({ error: 'server' }); tries = 0; pump(); return; }
+        tries++;
+        if (tries === 1 && global.NardyNet && NardyNet.onLost) NardyNet.onLost();
+        setTimeout(pump, Math.min(10000, 600 * Math.pow(2, tries - 1)));
+      });
+    }
+
+    function ask(path, extra) {
+      var body = { code: cur, key: keys[cur] };
+      for (var k in extra) body[k] = extra[k];
+      return new Promise(function (ok) {
+        queue.push({ path: path, body: body, ok: ok });
+        pump();
+      });
+    }
+
+    var cur = null;
+
+    function seated(d) {
+      if (d.error) return { ok: false, why: d.error };
+      cur = d.table.code;
+      keep(cur, d.key);
+      return { ok: true, seat: d.seat, table: d.table, code: cur };
+    }
+
+    return {
+      kind: 'srv',
+      hasLobby: false,
+      hasPresence: true,
+      authoritative: true,
+
+      watchLobby: function (cb) { cb([]); return function () {}; },
+
+      create: function (body) {
+        return post('/api/table', { seat: body.seat, opts: body.opts, who: who(body.who), initData: tg() })
+          .then(function (d) { return seated(d); });
+      },
+
+      sit: function (code, seat, w) {
+        return post('/api/table/sit', { code: code, key: keys[code], who: who(w), initData: tg() })
+          .then(function (d) { return seated(d); });
+      },
+
+      /* Долгое ожидание: сервер держит запрос, пока на столе ничего не
+         случилось (до 25 секунд), и отвечает сразу, как только случилось. */
+      watchTable: function (code, cb, onErr) {
+        cur = code;
+        var dead = false, after = -1, ctl = null, fails = 0, timer = null;
+
+        function loop() {
+          if (dead) return;
+          clearTimeout(timer);
+          ctl = typeof AbortController === 'function' ? new AbortController() : null;
+          var mine = ctl;
+          post('/api/table/watch', { code: code, key: keys[code], after: after }, ctl && ctl.signal)
+            .then(function (d) {
+              if (dead || mine !== ctl) return;
+              if (d.status === 404) { dead = true; cb(null); return; }
+              fails = 0;
+              if (d.table) { after = d.table.seq; cb(d.table); }
+              loop();
+            }, function (e) {
+              if (dead || mine !== ctl) return;          /* сами оборвали — уже ждём заново */
+              fails++;
+              if (fails === 3 && onErr) onErr(e);
+              timer = setTimeout(loop, Math.min(8000, 400 * Math.pow(2, fails)));
+            });
+        }
+
+        /* из фона iOS мог оборвать запрос молча — начинаем ждать заново сразу */
+        function wake() {
+          if (document.hidden || dead) return;
+          if (ctl) ctl.abort();
+          ctl = null;
+          loop();
+        }
+        document.addEventListener('visibilitychange', wake);
+        loop();
+
+        return function () {
+          dead = true;
+          clearTimeout(timer);
+          document.removeEventListener('visibilitychange', wake);
+          if (ctl) ctl.abort();
+        };
+      },
+
+      write: function () { return Promise.resolve(); },
+
+      peek: function (code) {
+        return post('/api/table/watch', { code: code, key: keys[code], after: -1 })
+          .then(function (d) { return d.table || null; });
+      },
+
+      turn: function (game, ply, moves) { return ask('/api/table/turn', { game: game, ply: ply, moves: moves }); },
+      offer: function () { return ask('/api/table/offer', {}); },
+      answer: function (yes) { return ask('/api/table/answer', { yes: !!yes }); },
+      again: function () { return ask('/api/table/again', {}); },
+
+      here: function () {},
+      watchPeers: function () { return function () {}; }
+    };
+  }
+
   /* ---------- выбор транспорта ---------- */
+
+  var skew = 0;           /* насколько часы сервера впереди наших */
 
   function connect() {
     if (boot) return boot;
@@ -329,6 +499,8 @@
         );
       }, function () { return relayIfPossible(); });
     }
+    var api = global.NardyAccount && NardyAccount.api();
+    if (api && typeof fetch === 'function') return Promise.resolve(srvTransport(api));
     return Promise.resolve(relayIfPossible());
   }
 
@@ -360,6 +532,10 @@
     kind: function () { return T ? T.kind : null; },
     hasLobby: function () { return !!(T && T.hasLobby); },
     hasRoom: function () { return !!(T && T.hasPresence); },
+    /* стол ведёт сервер — телефон ничего не пишет сам */
+    authoritative: function () { return !!(T && T.authoritative); },
+    /* время по часам сервера — для отсчёта хода */
+    now: function () { return Date.now() + skew; },
     watchLobby: api('watchLobby'),
     create: api('create'),
     sit: api('sit'),
@@ -368,6 +544,10 @@
     peek: api('peek'),
     here: api('here'),
     watchPeers: api('watchPeers'),
+    turn: api('turn'),
+    offer: api('offer'),
+    answer: api('answer'),
+    again: api('again'),
     leave: function () { if (T) T.here(null, null); }
   };
 })(window);

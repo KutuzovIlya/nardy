@@ -24,7 +24,7 @@
   var drag = null;
   var hinted = null;
 
-  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, banter: 'hard' };
+  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, banter: 'hard', timer: 'off', match: '0' };
   try {
     var prefs = JSON.parse(localStorage.getItem('nardy.opts') || 'null');
     if (prefs) { for (var k in prefs) if (opts[k] !== undefined) opts[k] = prefs[k]; }
@@ -70,12 +70,19 @@
     unpeers: null,
     peers: [],
     shown: false,     /* итог партии уже показан */
-    toss: null
+    toss: null,
+    moves: [],        /* шашки, сдвинутые за мой текущий ход, — уйдут серверу разом */
+    gid: null,        /* какая партия стола сейчас на доске */
+    turnKey: '',      /* чей и какой по счёту ход сейчас на доске */
+    warned: ''        /* о каком ходе уже предупредили «осталось 10 секунд» */
   };
   var lobbyOff = null;
   var bf = {};              /* какие подколы за партию уже прозвучали */
 
   function isNet() { return opts.mode === 'net' && !!net.code; }
+
+  /* Стол ведёт сервер: кости бросает он, ход уходит ему целиком */
+  function auth() { return isNet() && NardyNet.authoritative(); }
 
   /* Ссылка, по которой соперник попадает сразу за стол */
   function shareLink() {
@@ -507,19 +514,29 @@
         pts: VIS.pts.map(function (a) { return a.slice(); }),
         off: { w: VIS.off.w.slice(), b: VIS.off.b.slice() }
       },
-      moves: rows.length ? rows[rows.length - 1].moves.length : 0
+      moves: rows.length ? rows[rows.length - 1].moves.length : 0,
+      sent: net.moves.length
     };
   }
 
-  function doMove(mv) {
+  function doMove(mv) { doChain([mv]); }
+
+  /* Одна шашка за один жест — даже если это сумма костей: при 6-2
+     на 8 правила проверяют каждый шаг, а глазу видно одно движение,
+     прямо на 8, без заезда на промежуточный пункт. И отменяется
+     такой ход тоже целиком. */
+  function doChain(path) {
     tick++;
     undoStack.push(snapshot());
-    var p = S.turn;
-    var id = VIS.pts[mv.from].pop();
-    if (mv.to === N.OFF) VIS.off[p].push(id); else VIS.pts[mv.to].push(id);
-    N.applyTo(S, mv);
+    var p = S.turn, last = path[path.length - 1];
+    var id = VIS.pts[path[0].from].pop();
+    if (last.to === N.OFF) VIS.off[p].push(id); else VIS.pts[last.to].push(id);
+    path.forEach(function (mv) {
+      N.applyTo(S, mv);
+      if (auth() && p === net.seat) net.moves.push({ from: mv.from, to: mv.to, die: mv.die });
+    });
     if (rows.length) {
-      rows[rows.length - 1].moves.push(N.label(p, mv.from) + '/' + N.label(p, mv.to));
+      rows[rows.length - 1].moves.push(N.label(p, path[0].from) + '/' + N.label(p, last.to));
     }
     sel = null;
     clearHint();
@@ -527,13 +544,13 @@
     men[id].classList.remove('land');
     void men[id].offsetWidth;
     men[id].classList.add('land');
-    sfx(mv.to === N.OFF ? 'off' : 'move');
-    if (mv.to === N.OFF) quip('off', p);
+    sfx(last.to === N.OFF ? 'off' : 'move');
+    if (last.to === N.OFF) quip('off', p);
     renderLog();
     updateUI();
     persist();
     /* По сети отдельные шашки не шлём: сопернику уходит весь ход разом,
-       при передаче хода. Победу отправляет finish() вместе со счётом. */
+       при передаче хода. */
   }
 
   function undo() {
@@ -542,6 +559,7 @@
     var s = undoStack.pop();
     S = s.st;
     VIS = s.vis;
+    net.moves.length = s.sent;
     if (rows.length) rows[rows.length - 1].moves.length = s.moves;
     sel = null;
     legal = N.legalMoves(S);
@@ -551,7 +569,7 @@
   }
 
   function afterMove() {
-    if (S.winner) { finish(); return; }
+    if (S.winner) { auth() ? sendTurn() : finish(); return; }
     legal = N.legalMoves(S);
     if (!legal.length) {
       if (S.dice.length && !isAI(S.turn)) toast('Больше ходить нечем');
@@ -564,6 +582,7 @@
   }
 
   function passTurn() {
+    if (auth()) { sendTurn(); return; }
     if (S.winner) { finish(); return; }
     N.endTurn(S);
     if (isNet()) { busy = true; legal = []; markLive(); updateUI(); pushTable(); return; }
@@ -652,15 +671,9 @@
     if (!path || !path.length) return false;
     busy = true;
     reach = {};
-    playChain(path, 0);
+    doChain(path);
+    later(260, afterMove);
     return true;
-  }
-
-  /* Составной ход показываем по шагам — видно, каким путём шашка идёт */
-  function playChain(path, i) {
-    doMove(path[i]);
-    if (i + 1 < path.length) later(230, function () { playChain(path, i + 1); });
-    else later(260, afterMove);
   }
 
   function canPick(i) {
@@ -769,15 +782,20 @@
 
   /* ---------- игра по сети ---------- */
 
+  /* Подпись под именем (идёт в textContent — экранировать не нужно) */
   function seatLabel(p) {
     var who = net.table && net.table.seats ? net.table.seats[p] : null;
     if (!who) return 'место свободно';
-    if (who.id === NardyNet.id()) return esc(who.name || 'Игрок') + ' · вы';
+    var ms = clockLeft();
+    var clock = ms >= 0 && S.turn === p ? ' · ' + clockText(ms) : '';
+    if (who.id === NardyNet.id()) return (who.name || 'Игрок') + ' · вы' + clock;
     var tag = NardyNet.hasRoom() ? (oppOnline(p) ? ' · в сети' : ' · не в сети') : '';
-    return esc(who.name || 'Игрок') + tag;
+    return (who.name || 'Игрок') + (clock || tag);
   }
 
   function oppOnline(p) {
+    var t = net.table;
+    if (t && t.seen) return !!t.seen[p] && t.now - t.seen[p] < 45000;
     for (var i = 0; i < net.peers.length; i++) {
       var pr = net.peers[i].presence;
       if (pr && pr.table === net.code && pr.seat === p && !net.peers[i].isMe) return true;
@@ -862,21 +880,193 @@
     return VIS.off.w.length === S.off.w && VIS.off.b.length === S.off.b;
   }
 
+  /* ---------- стол, который ведёт сервер ---------- */
+
+  function turnKey(t) {
+    var st = t.state;
+    return t.gid + '|' + st.turn + '|' + st.turnNo.w + '|' + st.turnNo.b + '|' + (st.winner || '');
+  }
+
+  /* Ход готов — отдаём серверу все шашки разом. Ответ — новый стол
+     с костями соперника; по нему доска и выравнивается. */
+  function sendTurn() {
+    busy = true;
+    legal = [];
+    sel = null;
+    markLive();
+    updateUI();
+    var t = net.table;
+    NardyNet.turn(t.game, S.turnNo[net.seat], net.moves.slice()).then(function (d) {
+      if (!d || !d.table) return;
+      /* сервер ход не принял — ставим его позицию, иначе доски разойдутся */
+      var bad = d.error && d.error !== 'stale';
+      if (bad) toast('Ход не прошёл проверку — позиция восстановлена');
+      syncAuth(d.table, bad || d.error === 'stale');
+    });
+  }
+
+  function syncAuth(t, force) {
+    if (!t) {
+      toast('Стол закрыт');
+      quitTable(true);
+      return;
+    }
+    var old = net.table;
+    if (old && t.seq < old.seq) return;                  /* пришла старая копия */
+    var newer = !old || t.seq > old.seq || !S || force;
+    net.table = t;
+    if (t.tally) tally = t.tally;
+    if (t.status === 'open') {
+      updateUI();
+      if (sheet.dataset.kind === 'table' && veil.classList.contains('show')) tableSheet();
+      return;
+    }
+    /* соперник только что сел — окно со столом больше не нужно */
+    if ((!old || old.status === 'open') && sheet.dataset.kind === 'table' && veil.classList.contains('show')) {
+      closeSheet();
+      var opp = t.seats[N.opp(net.seat)];
+      toast((opp && opp.name ? opp.name : 'Соперник') + ' за столом — начинаем');
+    }
+    if (!newer) { updateUI(); return; }                   /* только «в сети» и часы */
+
+    offers(t);
+    var st = t.state, key = turnKey(t), fresh = t.gid !== net.gid;
+    /* свой ход в разгаре: мои сдвинутые шашки не трогаем */
+    if (!force && S && !fresh && key === net.turnKey && st.turn === net.seat && !st.winner) {
+      updateUI();
+      return;
+    }
+
+    tick++;
+    if (drag) onCancel();                     /* шашка в пальцах — отпускаем, позиция сменилась */
+    var rolled = fresh || key !== net.turnKey;
+    net.turnKey = key;
+    if (fresh) {
+      net.gid = t.gid;
+      net.shown = false;
+      bf = {}; recorded = false; NardyBanter.reset();
+      if (sheet.dataset.kind === 'result' && veil.classList.contains('show')) closeSheet();
+    }
+    S = st;
+    if (!VIS) VIS = visFrom(S);
+    reconcile();
+    sel = null;
+    undoStack = [];
+    net.moves = [];
+
+    if (rolled && t.last && t.last.auto && !fresh) {
+      toast(t.last.by === net.seat
+        ? 'Время вышло — за вас сходил компьютер. Просрочка ' + t.late[net.seat] + ' из 3'
+        : ((t.seats[t.last.by] || {}).name || 'Соперник') + ' не успел — за него сходил компьютер', 2600);
+    }
+    if (S.winner) {
+      busy = true;
+      legal = [];
+      renderDice(false);
+      markLive();
+      updateUI();
+      if (!net.shown) finish(false);
+      return;
+    }
+    if (fresh && t.toss && !S.turnNo.w && !S.turnNo.b) {
+      /* сначала жеребьёвка по кости с каждой стороны, потом первый бросок */
+      busy = true;
+      legal = [];
+      markLive();
+      updateUI();
+      NardyDice.clear();
+      renderOpeningDice(t.toss.a, t.toss.b);
+      sfx('dice');
+      toast('Жеребьёвка: ' + t.toss.a + ' — ' + t.toss.b + '. Первыми ходят ' +
+        (S.turn === 'w' ? 'белые' : 'чёрные'), 1600);
+      later(1700, function () { startTurn(true); });
+      return;
+    }
+    startTurn(rolled);
+  }
+
+  /* Начало хода: кости уже брошены сервером, осталось показать */
+  function startTurn(rolled) {
+    renderDice(rolled);
+    if (rolled) { sfx('dice'); banter(S.roll[0], S.roll[1]); }
+    if (net.seat !== S.turn) {
+      busy = true;
+      legal = [];
+      markLive();
+      updateUI();
+      return;
+    }
+    misses = 0;
+    legal = N.legalMoves(S);
+    if (!legal.length) {
+      busy = true;
+      toast('Ходов нет');
+      if (rolled) quip('stuck', S.turn, true);
+      markLive();
+      updateUI();
+      later(1500, passTurn);
+      return;
+    }
+    busy = false;
+    markLive();
+    updateUI();
+  }
+
+  /* предложение переиграть: сопернику — вопрос, себе — ответ */
+  function offers(t) {
+    if (t.offer && t.offer.by !== net.seat && net.seenOffer !== t.offer.ts) {
+      net.seenOffer = t.offer.ts;
+      offerSheet(t);
+    }
+    if (net.mineOffer && t.declined && t.declined !== net.seenDecline) {
+      net.seenDecline = t.declined;
+      net.mineOffer = 0;
+      toast('Соперник хочет доиграть');
+    }
+    if (net.mineOffer && !t.offer) net.mineOffer = 0;
+    if (sheet.dataset.kind === 'offer' && !t.offer && veil.classList.contains('show')) closeSheet();
+  }
+
+  /* Сколько осталось на ход — по часам сервера */
+  function clockLeft() {
+    var t = net.table;
+    if (!auth() || !t || !t.deadline || !S || S.winner) return -1;
+    return Math.max(0, t.deadline - NardyNet.now());
+  }
+
+  function clockText(ms) {
+    var s = Math.ceil(Math.min(ms, 60000) / 1000);     /* пока идёт жеребьёвка, часы стоят на минуте */
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+
+  setInterval(function () {
+    var ms = clockLeft();
+    if (ms < 0) return;
+    $('meta-' + S.turn).textContent = seatLabel(S.turn);
+    if (S.turn === net.seat && ms <= 10000 && ms > 0 && net.warned !== net.turnKey) {
+      net.warned = net.turnKey;
+      NardyTG.buzz('lose');
+      toast('Осталось 10 секунд');
+    }
+  }, 500);
+
   /* Единственный источник правды в сетевой партии — документ стола */
-  function syncFrom(t) {
+  function syncFrom(t, force) {
+    if (NardyNet.authoritative()) { syncAuth(t, force); return; }
     if (!t) {
       toast('Стол закрыт');
       quitTable(true);
       return;
     }
     if (net.table && (t.seq || 0) < (net.table.seq || 0)) return;   /* пришла старая копия */
+    var was = net.table ? net.table.status : 'open';
     net.table = t;
     if (t.status === 'open') {
       updateUI();
       if (sheet.dataset.kind === 'table' && veil.classList.contains('show')) tableSheet();
       return;
     }
-    if (sheet.dataset.kind === 'table' && veil.classList.contains('show')) {
+    if (was === 'open' && sheet.dataset.kind === 'table' && veil.classList.contains('show')) {
       closeSheet();
       var opp = t.seats[N.opp(net.seat)];
       toast((opp && opp.name ? esc(opp.name) : 'Соперник') + ' за столом — начинаем');
@@ -968,8 +1158,35 @@
     });
   }
 
+  /* Садимся за стол, который ведёт сервер: и свой новый, и чужой */
+  function seatedAuth(r) {
+    net.seat = r.seat;
+    net.table = null;
+    net.gid = null;
+    net.turnKey = '';
+    S = null;
+    rows = [];
+    tally = r.table.tally || { w: 0, b: 0 };
+    VIS = visFrom(r.table.state);
+    closeSheet();
+    openTable(r.code);
+    syncAuth(r.table);
+  }
+
   function createTable() {
     var seat = opts.human === 'b' ? 'b' : 'w';
+    if (NardyNet.authoritative()) {
+      NardyNet.create({
+        seat: seat,
+        who: { name: NardyNet.name() || 'Игрок', photo: NardyTG.photo() },
+        opts: { timer: opts.timer === 'on', to: Number(opts.match) || 0 }
+      }).then(function (r) {
+        if (!r.ok) { toast('Не удалось создать стол'); return; }
+        seatedAuth(r);
+        tableSheet();
+      }, function () { toast('Сервер не отвечает — стол не создан'); });
+      return;
+    }
     var seats = { w: null, b: null };
     seats[seat] = { id: NardyNet.id(), name: NardyNet.name() || 'Игрок', photo: NardyTG.photo() };
     var fresh = N.create();
@@ -1011,6 +1228,7 @@
         }[r.why] || 'Не вышло сесть за стол');
         return;
       }
+      if (NardyNet.authoritative()) { seatedAuth(r); return; }
       net.seat = r.seat;
       net.table = r.table;
       S = null;
@@ -1040,10 +1258,8 @@
       foe = { id: opts.level, name: 'Компьютер · ' + lvl, kind: 'ai' };
       mine = opts.human;
     } else return;
+    /* в общий профиль партию по сети записывает сервер — сам, без нас */
     NardyStats.record(foe, winner === mine, mars);
-    if (isNet() && net.table && net.table.gid) {
-      NardyAccount.report(net.table.gid, foe, winner === mine, mars);
-    }
   }
 
   function loginSheet() {
@@ -1164,6 +1380,12 @@
 
   function rematch() {
     if (!isNet()) { newGame(); return; }
+    if (auth()) {
+      closeSheet();
+      net.mineOffer = 0;
+      NardyNet.again().then(function (d) { if (d && d.table) syncAuth(d.table); });
+      return;
+    }
     var t = toss(), st = N.create();
     st.turn = t.turn;
     net.shown = false;
@@ -1188,6 +1410,9 @@
     net.code = net.seat = net.table = null;
     net.peers = [];
     net.shown = false;
+    net.gid = null;
+    net.turnKey = '';
+    net.moves = [];
     NardyNet.leave();
     try { localStorage.removeItem('nardy.net'); } catch (e) {}
     opts.mode = 'ai';
@@ -1284,6 +1509,13 @@
       esc(NardyNet.name()) + '"></div>' +
       '<div class="field"><label>Вы играете</label>' +
       segHTML('human', [['w', 'белыми'], ['b', 'чёрными']], opts.human) + '</div>' +
+      /* часы и матч держит сервер — без него их некому считать */
+      (NardyNet.authoritative()
+        ? '<div class="field"><label>Время на ход</label>' +
+          segHTML('timer', [['off', 'Без часов'], ['on', '60 секунд']], opts.timer) + '</div>' +
+          '<div class="field"><label>Счёт</label>' +
+          segHTML('match', [['0', 'Подряд'], ['3', 'До 3'], ['5', 'До 5'], ['7', 'До 7']], opts.match) + '</div>'
+        : '') +
       '<div class="sheet-actions">' +
       '<button class="btn" type="button" data-act="back">Назад</button>' +
       '<button class="btn btn-key" type="button" data-act="net-new">Создать стол</button></div>' +
@@ -1353,7 +1585,9 @@
       '</p>' +
       '<div class="code-big mono">' + esc(net.code) + '</div>' +
       '<p class="hint" style="text-align:center">' +
-      (waiting ? 'Ждём соперника…' : 'Вы играете ' + (net.seat === 'w' ? 'белыми' : 'чёрными')) + '</p>' +
+      (waiting ? 'Ждём соперника…' : 'Вы играете ' + (net.seat === 'w' ? 'белыми' : 'чёрными')) +
+      (t.opts ? '<br>' + (t.opts.to ? 'Матч до ' + t.opts.to + ' побед' : 'Играем подряд, без счёта до победы') +
+        (t.opts.timer ? ' · 60 секунд на ход' : ' · без часов') : '') + '</p>' +
       /* внутри артефакта страница живёт в песочнице — её адрес сопернику не отдать */
       (NardyTG.on && NardyTG.bot()
         ? '<div class="sheet-actions" style="margin-top:14px">' +
@@ -1383,7 +1617,14 @@
     if (!isNet()) return;
     closeSheet();
     net.mineOffer = Date.now();
-    pushTable({ offer: { by: net.seat, ts: net.mineOffer } });
+    if (auth()) {
+      NardyNet.offer().then(function (d) {
+        if (d && d.error === 'busy') { net.mineOffer = 0; toast('Соперник уже предложил сам'); }
+        if (d && d.table) syncAuth(d.table);
+      });
+    } else {
+      pushTable({ offer: { by: net.seat, ts: net.mineOffer } });
+    }
     toast('Предложил начать заново. Ждём ответа');
   }
 
@@ -1404,6 +1645,11 @@
   function answerOffer(yes) {
     closeSheet();
     if (!isNet() || !net.table) return;
+    if (auth()) {
+      NardyNet.answer(yes).then(function (d) { if (d && d.table) syncAuth(d.table); });
+      if (!yes) toast('Доигрываем');
+      return;
+    }
     if (yes) { rematch(); return; }              /* rematch сам снимет предложение */
     pushTable({ offer: null, declined: Date.now() });
     toast('Доигрываем');
@@ -1423,7 +1669,7 @@
       '<h3>Правило шести</h3><p>Нельзя выстроить шесть своих пунктов подряд, если все 15 шашек соперника окажутся заперты позади. ' +
       'Хотя бы одна чужая шашка должна быть впереди блока.</p>' +
       '<h3>Выход</h3><p>Когда все 15 шашек собраны в доме, их снимают с доски. Точное число снимает шашку с этого пункта; ' +
-      'большее — только с самой дальней. Кто снял все шашки первым, выиграл. Если соперник не снял ни одной — это <b>марс</b>, две партии.</p>' +
+      'большее — только с самой дальней. Кто снял все шашки первым, выиграл. Если соперник не снял ни одной — это <b>марс</b>: почётно, но очко всё равно одно.</p>' +
       '</div>' +
       '<div class="sheet-actions"><button class="btn btn-key" type="button" data-act="close">Понятно</button></div>'
     );
@@ -1437,7 +1683,11 @@
     renderSpots();
     markLive();
     var w = S.winner, l = N.opp(w);
-    var mars = S.off[l] === 0;
+    /* у серверного стола итог записан в самом столе: там и марс, и причина */
+    var end = auth() && net.table ? net.table.end : null;
+    var match = auth() && net.table && net.table.match && net.table.match.over;
+    var mars = end ? !!end.mars : S.off[l] === 0;
+    var late = !!(end && end.why === 'time');
     keepScore(w, mars);
     quip(mars ? 'mars' : 'win', w, true);
     if (bump !== false) {
@@ -1446,24 +1696,31 @@
       if (isNet()) pushTable({ status: 'done' });
     }
     updateUI();
-    sfx('win');
+    var me = isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : null);
+    sfx(me && me !== w ? 'lose' : 'win');
     later(900, function () {
       sheetKind = 'result';
+      var seat = isNet() && net.table && net.table.seats ? net.table.seats[w] : null;
       var who = isNet()
-        ? (net.seat === w ? 'Вы победили' : nameOf(w) + ' победили')
+        ? (net.seat === w ? 'Вы победили' : 'Победа: ' + ((seat && seat.name) || nameOf(w)))
         : nameOf(w) + ' победили';
+      var why = late ? (net.seat === w ? 'Соперник трижды подряд не успел сходить.' : 'Три просрочки подряд — партия отдана.')
+        : mars ? 'Марс — соперник не снял ни одной шашки.' : 'Партия закрыта.';
+      var score = match
+        ? (net.seat === w ? 'Матч ваш — ' : 'Матч проигран — ') + tally[net.seat] + ' : ' + tally[N.opp(net.seat)] + '.'
+        : 'Счёт матча ' + tally.w + ' : ' + tally.b + '.';
       openSheet(
         '<div class="crown"><span class="disc ' + w + '"></span></div>' +
-        '<h1 style="text-align:center">' + who + '</h1>' +
-        '<p class="lede" style="text-align:center;margin-inline:auto">' +
-        (mars ? 'Марс — соперник не снял ни одной шашки.' : 'Партия закрыта.') +
-        '<br>Счёт матча ' + tally.w + ' : ' + tally.b + '.</p>' +
+        '<h1 style="text-align:center">' + esc(who) + '</h1>' +
+        '<p class="lede" style="text-align:center;margin-inline:auto">' + why + '<br>' + score + '</p>' +
         '<div class="sheet-actions">' +
         (isNet()
           ? '<button class="btn" type="button" data-act="net-quit">Покинуть стол</button>'
           : '<button class="btn" type="button" data-act="reset">Сбросить счёт</button>') +
-        '<button class="btn btn-key" type="button" data-act="again">Ещё партию</button></div>'
+        '<button class="btn btn-key" type="button" data-act="again">' + (match ? 'Новый матч' : 'Ещё партию') + '</button></div>'
       );
+      var disc = sheet.querySelector('.crown .disc');
+      if (disc) disc.style.backgroundImage = 'url(' + B.checker(w, 96) + ')';
     });
   }
 
@@ -1683,6 +1940,15 @@
       S = null;
       rows = [];
       closeSheet();
+      if (NardyNet.authoritative()) {
+        net.table = null;
+        net.gid = null;
+        net.turnKey = '';
+        VIS = visFrom(t.state);
+        openTable(back.code);
+        syncAuth(t);
+        return;
+      }
       openTable(back.code);
     }, function () {});
   });

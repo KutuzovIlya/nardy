@@ -77,25 +77,13 @@
     save();
   }
 
-  /* Итог партии уходит на сервер. Засчитают, когда соперник
-     подтвердит тот же исход со своей стороны. */
-  function report(gameId, foe, win, mars) {
-    var initData = global.NardyTG ? NardyTG.initData() : '';
-    if (!API || !initData || !me || me.guest || !gameId || !foe || !foe.id) {
-      return Promise.resolve(null);
-    }
-    return ask('/api/result', {
-      initData: initData, gameId: gameId,
-      foeId: foe.id, foeName: foe.name, win: !!win, mars: !!mars
-    }).then(null, function () { return null; });
-  }
-
   function profile(id) { return ask('/api/profile?id=' + encodeURIComponent(id || (me && me.id) || '')); }
   function top() { return ask('/api/top'); }
 
   global.NardyAccount = {
+    api: function () { return API; },
     hasServer: hasServer, signed: signed, user: user,
     login: login, logout: logout, rename: rename,
-    report: report, profile: profile, top: top
+    profile: profile, top: top
   };
 })(window);

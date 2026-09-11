@@ -1,25 +1,13 @@
 /* Запуск под Node: для проверки на своей машине и для тех,
-   кто захочет держать сервер сам. Хранилище — обычный JSON-файл.
+   кто захочет держать сервер сам. Хранилище — JSON-файл.
    BOT_TOKEN=... node server/node.mjs 8787 */
 import http from 'node:http';
-import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './app.mjs';
+import { memStore } from './memstore.mjs';
 
-const PORT = Number(process.argv[2]) || 8787;
-const FILE = path.join(process.cwd(), 'server', '.data.json');
-
-let db = {};
-try { db = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { db = {}; }
-const flush = () => fs.writeFileSync(FILE, JSON.stringify(db));
-
-const store = {
-  async get(key) { return db[key] ? JSON.parse(JSON.stringify(db[key])) : null; },
-  async set(key, val) { db[key] = val; flush(); },
-  async list(prefix) {
-    return Object.keys(db).filter((k) => k.startsWith(prefix)).map((k) => db[k]);
-  }
-};
+const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 8787;
+const store = memStore(path.join(process.cwd(), 'server', '.store.json'));
 
 const cfg = { botToken: process.env.BOT_TOKEN || '', origin: process.env.ORIGIN || '*' };
 

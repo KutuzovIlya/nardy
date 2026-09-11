@@ -289,4 +289,4 @@
     applyTo: applyTo, rawMoves: rawMoves, legalMoves: legalMoves,
     maxDepth: maxDepth, sequences: sequences, chains: chains, rollDie: rollDie
   };
-})(window);
+})(typeof window !== 'undefined' ? window : globalThis);

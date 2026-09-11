@@ -9,6 +9,15 @@
       ],
       "port": 8767,
       "autoPort": true
+    },
+    {
+      "name": "nardy-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/node.mjs",
+        "8787"
+      ],
+      "port": 8787
     }
   ]
 }

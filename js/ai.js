@@ -132,4 +132,4 @@
   function byScore(a, b) { return b.score - a.score; }
 
   global.NardyAI = { choose: choose, evaluate: evaluate };
-})(window);
+})(typeof window !== 'undefined' ? window : globalThis);
