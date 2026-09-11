@@ -100,6 +100,7 @@
 
   global.NardyAccount = {
     api: function () { return API; },
+    fb: fb,
     hasServer: hasServer, signed: signed, user: user,
     login: login, logout: logout, rename: rename,
     profile: profile, top: top

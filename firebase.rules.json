@@ -26,6 +26,13 @@
           ".write": "auth != null && newData.exists()",
           ".validate": "newData.hasChildren(['id', 'rev']) && newData.child('id').val() === $acc && ((!data.exists() && newData.child('rev').val() === 1) || (data.exists() && newData.child('rev').val() === data.child('rev').val() + 1))"
         }
+      },
+      "photos": {
+        "$acc": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.isString() && newData.val().length < 40000 && newData.val().beginsWith('data:image/jpeg;base64,')"
+        }
       }
     }
   }

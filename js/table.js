@@ -47,15 +47,21 @@
     return /^[A-Z0-9]{4,8}$/.test(c) ? c : null;
   }
 
-  /* Кто садится. acc — аккаунт Telegram, если он известен */
+  /* Кто садится. acc — аккаунт Telegram, если он известен.
+     look — чем показывать лицо: фото из Telegram, своё фото или медальон */
   function person(who, acc) {
     who = who && typeof who === 'object' ? who : {};
     var photo = clean(acc && acc.photo ? acc.photo : who.photo, 400);
+    var look = who.look && typeof who.look === 'object' ? who.look : {};
     return {
       id: clean(who.id, 40) || 'p' + code6().toLowerCase(),
       name: clean(acc && acc.name ? acc.name : who.name, 24) || 'Игрок',
       photo: /^https:\/\//.test(photo) ? photo : '',
-      acc: acc ? acc.id : null
+      acc: acc ? acc.id : null,
+      look: {
+        pic: /^(tg|photo|medal)$/.test(look.pic) ? look.pic : 'tg',
+        medal: /^[a-z]{2,12}$/.test(look.medal) ? look.medal : 'star'
+      }
     };
   }
 

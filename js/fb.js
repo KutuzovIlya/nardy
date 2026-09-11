@@ -194,6 +194,32 @@
     return get('users/' + encodeURIComponent(id)).then(function (u) { return u ? T.pub(u) : null; });
   }
 
+  /* Своё: имя, «о себе», медальон, чем показывать лицо */
+  function saveMe(me, patch) {
+    return update('users/' + me.id, function (u) {
+      u = u || T.blankUser({ id: me.id, name: me.name, photo: me.photo }, now());
+      for (var k in patch) u[k] = patch[k];
+      u.updated = now();
+      return u;
+    }, 'rev');
+  }
+
+  /* Своё фото лежит отдельно от профиля — чтобы рейтинг не тянул
+     полсотни картинок разом */
+  var photos = {};
+  function photoOf(acc) {
+    if (!acc) return Promise.resolve('');
+    if (photos[acc] !== undefined) return Promise.resolve(photos[acc]);
+    return get('photos/' + encodeURIComponent(acc)).then(function (p) {
+      photos[acc] = typeof p === 'string' ? p : '';
+      return photos[acc];
+    }, function () { return ''; });
+  }
+  function putPhoto(acc, data) {
+    photos[acc] = data;
+    return put('photos/' + encodeURIComponent(acc), data);
+  }
+
   function top() {
     return get('users', '&orderBy=%22w%22&limitToLast=50').then(function (all) {
       var list = [], k;
@@ -228,7 +254,11 @@
     var cur = null, clockTimer = null;
 
     function who(w) {
-      return { id: myId(), name: (w && w.name) || myName() || 'Игрок', photo: (w && w.photo) || '' };
+      var v = global.NardyProfile ? NardyProfile.look() : {};
+      return {
+        id: myId(), name: (w && w.name) || myName() || 'Игрок', photo: (w && w.photo) || '',
+        look: { pic: v.pic || 'tg', medal: v.medal || 'star' }
+      };
     }
 
     function create(body) {
@@ -441,6 +471,9 @@
   global.NardyFB = {
     transport: transport,
     profile: profile,
+    saveMe: saveMe,
+    photoOf: photoOf,
+    putPhoto: putPhoto,
     top: top,
     now: now,
     ready: function () { return typeof fetch === 'function' && typeof EventSource === 'function'; }

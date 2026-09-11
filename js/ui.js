@@ -78,6 +78,7 @@
   };
   var lobbyOff = null;
   var bf = {};              /* какие подколы за партию уже прозвучали */
+  var sixes = { w: 0, b: 0 };  /* сколько раз за партию выпало 6-6 — для наколки */
 
   function isNet() { return opts.mode === 'net' && !!net.code; }
 
@@ -498,7 +499,22 @@
     });
   }
 
-  /* Аватарка: фото из Telegram у людей, резная шашка у компьютера */
+  /* Аватарка: у людей — фото или медальон, у компьютера — резная шашка */
+  var seatPhotos = {};
+
+  function seatPic(seat) {
+    var lk = seat.look || {};
+    if (lk.pic === 'medal') return NardyProfile.medal(lk.medal, 96);
+    if (lk.pic === 'photo' && seat.acc && window.NardyFB) {
+      if (seatPhotos[seat.acc] === undefined) {
+        seatPhotos[seat.acc] = '';
+        NardyFB.photoOf(seat.acc).then(function (src) { seatPhotos[seat.acc] = src || ''; updateUI(); });
+      }
+      if (seatPhotos[seat.acc]) return seatPhotos[seat.acc];
+    }
+    return seat.photo || '';
+  }
+
   function setAvatars() {
     ['w', 'b'].forEach(function (p) {
       var box = $('ava-' + p);
@@ -506,9 +522,9 @@
       var url = '';
       if (isNet()) {
         var seat = net.table && net.table.seats ? net.table.seats[p] : null;
-        url = seat && seat.photo ? seat.photo : '';
-      } else if (!isAI(p) && (opts.mode !== 'ai' || p === opts.human)) {
-        url = NardyTG.photo();
+        url = !seat ? '' : (p === net.seat ? myPic(96) : seatPic(seat));
+      } else if (opts.mode === 'ai' && p === opts.human) {
+        url = myPic(96);
       }
       if (box.dataset.url === url) return;
       box.dataset.url = url;
@@ -658,6 +674,7 @@
   /* На каждый бросок — своя реплика. Редкое событие важнее обычного броска */
   function banter(d1, d2) {
     var p = S.turn, ev;
+    if (d1 === 6 && d2 === 6) sixes[p]++;
     if (!S.turnNo.w && !S.turnNo.b) ev = 'start';
     else if (!bf['home' + p] && N.allHome(S, p) && S.off[p] < 12) { bf['home' + p] = 1; ev = 'home'; }
     else if (!bf['almost' + p] && S.off[p] >= 12) { bf['almost' + p] = 1; ev = 'almost'; }
@@ -970,7 +987,7 @@
     if (fresh) {
       net.gid = t.gid;
       net.shown = false;
-      bf = {}; recorded = false; NardyBanter.reset();
+      bf = {}; sixes = { w: 0, b: 0 }; recorded = false; NardyBanter.reset();
       if (sheet.dataset.kind === 'result' && veil.classList.contains('show')) closeSheet();
     }
     S = st;
@@ -1277,15 +1294,19 @@
     if (isNet()) {
       var seat = net.table && net.table.seats ? net.table.seats[N.opp(net.seat)] : null;
       if (!seat) return;
-      foe = { id: seat.id, name: seat.name, kind: 'net' };
+      foe = { id: seat.id, name: seat.name, kind: 'net', acc: seat.acc || null };
       mine = net.seat;
     } else if (opts.mode === 'ai') {
       var lvl = { easy: 'Новичок', normal: 'Опытный', hard: 'Мастер' }[opts.level];
       foe = { id: opts.level, name: 'Компьютер · ' + lvl, kind: 'ai' };
       mine = opts.human;
     } else return;
-    /* в общий профиль партию по сети записывает сервер — сам, без нас */
-    NardyStats.record(foe, winner === mine, mars);
+    /* в общий профиль партию по сети записывает сам стол — здесь только своё, на телефоне */
+    var end = auth() && net.table ? net.table.end : null;
+    NardyStats.record(foe, winner === mine, mars, {
+      six: sixes[mine] || 0,
+      shutout: !!(end && end.shutout && winner === mine)
+    });
   }
 
   function loginSheet() {
@@ -1320,7 +1341,7 @@
     NardyAccount.login(name).then(function (u) {
       NardyNet.rename(u.name);
       if (u.guest && u.why) toast('Вошли гостем: ' + u.why, 2600);
-      setupSheet();
+      homeSheet();
     });
   }
 
@@ -1349,59 +1370,297 @@
     });
   }
 
-  function profileSheet() {
-    var u = NardyAccount.user();
-    sheetKind = 'profile';
-    if (NardyAccount.hasServer() && u && !u.guest) {
-      openSheet('<h1>' + esc(u.name) + '</h1><p class="lede">Загружаем…</p>');
-      NardyAccount.profile().then(function (d) { drawProfile(d.user); },
-                                 function () { drawProfile(null); });
-      return;
-    }
-    drawProfile(null);
+  /* ---------- профиль — главный экран ---------- */
+
+  var remoteMe = null;      /* профиль из общей базы, если игрок из Telegram */
+
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
   }
 
-  /* Профиль показываем с сервера, если он есть; иначе своё, с устройства */
-  function drawProfile(srv) {
+  function meInfo() {
     var u = NardyAccount.user() || {};
-    var name = (srv && srv.name) || u.name || NardyNet.name() || 'Игрок';
-    var t, rows, bros;
-    if (srv) {
-      t = { w: srv.w, l: srv.l, mars: srv.mars, marsLost: srv.marsLost };
-      rows = srv.foes;
-      bros = {};
-      (srv.bros || []).forEach(function (id) { bros[id] = true; });
-    } else {
-      var st = NardyStats.summary();
-      t = st.total;
-      rows = st.foes.filter(function (f) { return f.games > 0; }).slice(0, 10);
-      bros = st.bros;
-    }
-    sheetKind = 'profile';
+    return {
+      id: u.id || null,
+      name: u.name || NardyNet.name() || 'Игрок',
+      guest: !u.id || !!u.guest,
+      tg: NardyTG.photo(),
+      look: NardyProfile.look()
+    };
+  }
+
+  function myPic(size) { var m = meInfo(); return NardyProfile.picture(m.look, m.tg, size); }
+
+  /* Общий профиль в базе есть только у игроков из Telegram */
+  function shared() {
+    var u = NardyAccount.user();
+    return !!(u && !u.guest && NardyAccount.fb && NardyAccount.fb());
+  }
+
+  function homeSheet() {
+    drawHome();
+    if (!shared()) return;
+    NardyAccount.profile().then(function (d) {
+      remoteMe = d && d.user ? d.user : remoteMe;
+      if (sheet.dataset.kind === 'home' && veil.classList.contains('show')) drawHome();
+    }, function () {});
+  }
+
+  /* Сводка «с людьми»: из общей базы, если она есть, иначе с телефона */
+  function peopleStats() {
+    var st = NardyStats.summary(), srv = shared() ? remoteMe : null, k;
+    var P = srv
+      ? { w: srv.w, l: srv.l, mars: srv.mars, marsLost: srv.marsLost, streak: srv.streak, best: srv.best,
+          foes: srv.foes || [], bros: srv.bros || [], recent: (srv.recent || []).map(function (g) {
+            return { at: g.at, win: g.win, mars: g.mars, why: g.why, kind: 'net', name: g.foe && g.foe.name, acc: g.foe && g.foe.acc };
+          }) }
+      : { w: st.people.w, l: st.people.l, mars: st.people.mars, marsLost: st.people.marsLost, streak: st.streak, best: st.best,
+          foes: st.foes.filter(function (f) { return f.kind === 'net' && f.games > 0; }),
+          bros: Object.keys(st.bros), recent: st.recent.filter(function (g) { return g.kind === 'net'; }) };
+    P.badges = {};
+    for (k in st.badges) P.badges[k] = st.badges[k];
+    if (srv && srv.badges) for (k in srv.badges) P.badges[k] = srv.badges[k];
+    /* последние партии: с людьми и с компьютером вперемешку, свежие сверху */
+    P.last = P.recent.concat(st.recent.filter(function (g) { return g.kind === 'ai'; }))
+      .sort(function (a, b) { return b.at - a.at; }).slice(0, 10);
+    P.ai = st.ai;
+    return P;
+  }
+
+  function statsGrid(P) {
+    var games = P.w + P.l, pct = games ? Math.round(P.w * 100 / games) : 0;
+    var streak = P.streak > 0 ? '+' + P.streak : String(P.streak || 0);
+    function cell(v, t) { return '<div><b>' + v + '</b><span>' + t + '</span></div>'; }
+    return '<div class="stats">' +
+      cell(games, plural(games, 'партия', 'партии', 'партий')) +
+      cell(P.w + ':' + P.l, 'победы : поражения') +
+      cell(pct + '%', 'побед') +
+      cell((P.mars || 0) + ' / ' + (P.marsLost || 0), 'марсы: ставил / ловил') +
+      cell(streak, 'серия') +
+      cell(P.best || 0, 'лучшая серия') +
+      '</div>';
+  }
+
+  function badgesRow(got) {
+    return '<div class="badges">' + NardyProfile.BADGES.map(function (b) {
+      var on = !!(got && got[b.id]);
+      return '<div class="badge' + (on ? ' got' : '') + '" title="' + esc(b.hint) + '">' +
+        '<i>' + b.mark + '</i><span>' + b.name + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function drawHome() {
+    var m = meInfo(), P = peopleStats(), r = NardyProfile.rank(P.w);
+    var bros = {};
+    P.bros.forEach(function (id) { bros[id] = true; });
+    var lvl = { easy: 'новичок', normal: 'опытный', hard: 'мастер' }[opts.level];
+    sheetKind = 'home';
     openSheet(
-      '<h1>' + esc(name) + '</h1>' +
-      '<p class="lede">' + (srv
-        ? 'Общий профиль: считается на сервере, партия засчитывается, когда её подтвердят оба.'
-        : 'Считается на этом устройстве.') + '</p>' +
-      '<div class="field"><label>Всего</label>' +
-      '<ul class="tables"><li><b class="mono">' + t.w + ' : ' + t.l + '</b>' +
-      '<span>' + (t.w + t.l) + ' партий' +
-      (t.mars ? ' · марсов ' + t.mars : '') +
-      (t.marsLost ? ' · сам ловил ' + t.marsLost : '') + '</span></li></ul></div>' +
+      '<div class="home">' +
+      '<div class="me">' +
+        '<button class="me-ava" type="button" data-act="look" aria-label="Сменить лицо"><img alt="" src="' + esc(myPic(160)) + '"></button>' +
+        '<div class="me-who">' +
+          '<h1>' + esc(m.name) + '</h1>' +
+          '<div class="rank"><b>' + r.name + '</b>' + (r.next
+            ? ' · ещё ' + r.need + ' ' + plural(r.need, 'победа', 'победы', 'побед') + ' до ' + r.next
+            : ' · выше некуда') + '</div>' +
+          '<button class="about' + (m.look.about ? '' : ' empty') + '" type="button" data-act="about">' +
+            (m.look.about ? '«' + esc(m.look.about) + '»' : 'Написать о себе') + '</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="play">' +
+        (saved ? '<button class="btn btn-key" type="button" data-act="resume">Продолжить партию</button>' : '') +
+        '<button class="btn' + (saved ? '' : ' btn-key') + '" type="button" data-act="play-ai">Играть с компьютером</button>' +
+        '<div class="play-2">' +
+          '<button class="btn" type="button" data-act="play-net">Позвать человека</button>' +
+          '<button class="btn" type="button" data-act="play-duo">Вдвоём</button>' +
+        '</div>' +
+        '<button class="linkish" type="button" data-act="setup">Компьютер — ' + lvl + ', вы ' +
+          (opts.human === 'b' ? 'чёрными' : 'белыми') + '. Изменить</button>' +
+      '</div>' +
+
+      '<div class="field"><label>С людьми · звание и наколки только за них</label>' + statsGrid(P) + '</div>' +
+      '<div class="field"><label>Наколки</label>' + badgesRow(P.badges) + '</div>' +
+
       '<div class="field"><label>С кем играл</label><ul class="tables">' +
-      (rows && rows.length ? rows.map(function (f) {
-        return '<li><b class="mono">' + f.w + ':' + f.l + '</b><span>' + esc(f.name) +
-          (bros[f.id] ? ' <em class="bro">братишка</em>' : '') + '</span>' +
-          '<span class="dim">' + (f.games || f.w + f.l) + '</span></li>';
-      }).join('') : '<li class="muted">Пока никого. Сыграйте партию.</li>') +
+        (P.foes.length ? P.foes.slice(0, 12).map(function (f) {
+          return '<li class="tap" data-act="foe" data-id="' + esc(f.id) + '" data-acc="' + esc(f.acc || '') + '" data-name="' + esc(f.name) + '">' +
+            '<b class="mono">' + f.w + ':' + f.l + '</b><span>' + esc(f.name) +
+            (bros[f.id] ? ' <em class="bro">братишка</em>' : '') + '</span>' +
+            '<span class="dim">' + (f.games || f.w + f.l) + '</span></li>';
+        }).join('') : '<li class="muted">Пока никого. Позовите человека — появятся и братишки.</li>') +
       '</ul></div>' +
+
+      (P.last.length
+        ? '<div class="field"><label>Последние партии</label><ul class="tables">' + P.last.map(function (g) {
+            return '<li><b class="mono' + (g.win ? ' won' : ' lost') + '">' + (g.win ? 'П' : 'П̶') + '</b>' +
+              '<span>' + (g.win ? 'Победа' : 'Поражение') + (g.mars ? ' марсом' : '') + (g.why === 'time' ? ' по времени' : '') +
+              ' · ' + esc(g.name || (g.kind === 'ai' ? 'компьютер' : 'соперник')) + '</span>' +
+              '<span class="dim">' + ago(g.at) + '</span></li>';
+          }).join('') + '</ul></div>'
+        : '') +
+
+      '<div class="field"><label>С компьютером</label><ul class="tables"><li><b class="mono">' +
+        P.ai.w + ':' + P.ai.l + '</b><span>' + (P.ai.w + P.ai.l) + ' ' +
+        plural(P.ai.w + P.ai.l, 'партия', 'партии', 'партий') + ' — в звание не идут</span></li></ul></div>' +
+
       '<div class="sheet-actions">' +
-      (NardyAccount.hasServer()
-        ? '<button class="btn" type="button" data-act="top">Рейтинг</button>' +
-          '<button class="btn" type="button" data-act="logout">Выйти</button>'
-        : '<button class="btn" type="button" data-act="stats-reset">Обнулить</button>') +
-      '<button class="btn btn-key" type="button" data-act="close">Закрыть</button></div>'
+        (NardyAccount.hasServer() ? '<button class="btn" type="button" data-act="top">Рейтинг</button>' : '') +
+        '<button class="btn" type="button" data-act="rules">Правила</button>' +
+        (S ? '<button class="btn" type="button" data-act="close">К доске</button>' : '') +
+      '</div>' +
+      '<div class="sheet-actions" id="home-add" hidden><button class="btn" type="button" data-act="home-add">' +
+        'Значок на экран «Домой»</button></div>' +
+      '</div>'
     );
+    NardyTG.homeScreen(function (status) {
+      var box = $('home-add');
+      if (box && (status === 'missed' || status === 'unknown')) box.hidden = false;
+    });
+  }
+
+  function ago(ts) {
+    if (!ts) return '';
+    var d = Math.max(0, Date.now() - ts), m = Math.round(d / 60000);
+    if (m < 1) return 'только что';
+    if (m < 60) return m + ' мин';
+    var h = Math.round(m / 60);
+    if (h < 24) return h + ' ч';
+    var days = Math.round(h / 24);
+    return days + ' ' + plural(days, 'день', 'дня', 'дней');
+  }
+
+  /* ---------- лицо за столом: фото из Telegram, своё фото или медальон ---------- */
+
+  function lookSheet() {
+    var m = meInfo(), v = m.look;
+    /* без фото из Telegram вместо него показывается медальон — он и выбран */
+    var cur = v.pic === 'medal' || (v.pic === 'tg' && !m.tg) || (v.pic === 'photo' && !v.photo)
+      ? 'medal:' + v.medal : v.pic;
+    function pick(val, img, label) {
+      return '<button class="look-pick" type="button" data-act="look-pick" data-v="' + val + '" aria-pressed="' + (cur === val) + '">' +
+        (img ? '<img alt="" src="' + esc(img) + '">' : '<i>+</i>') +
+        (label ? '<span>' + label + '</span>' : '') + '</button>';
+    }
+    sheetKind = 'look';
+    openSheet(
+      '<h1>Лицо за столом</h1>' +
+      '<p class="lede">Его видит соперник рядом с вашим именем.</p>' +
+      '<div class="looks">' +
+        (m.tg ? pick('tg', m.tg, 'Telegram') : '') +
+        pick('photo', v.photo, v.photo ? 'Своё фото' : 'Загрузить') +
+        NardyProfile.MEDALS.map(function (md) { return pick('medal:' + md.id, NardyProfile.medal(md.id, 120), ''); }).join('') +
+      '</div>' +
+      (v.photo ? '<p class="hint" style="text-align:center"><button class="linkish" type="button" data-act="look-upload">Загрузить другое фото</button></p>' : '') +
+      '<input type="file" id="look-file" accept="image/*" hidden>' +
+      '<div class="sheet-actions"><button class="btn btn-key" type="button" data-act="home">Готово</button></div>'
+    );
+    $('look-file').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      NardyProfile.shrink(f).then(function (data) {
+        NardyProfile.setLook({ pic: 'photo', photo: data });
+        var u = NardyAccount.user();
+        if (shared()) NardyFB.putPhoto(u.id, data).then(function () { syncLook({ pic: 'photo' }); }, noSync);
+        lookSheet();
+        updateUI();
+      }, function () { toast('Это не похоже на картинку'); });
+    });
+  }
+
+  function pickLook(val) {
+    if (val === 'photo' && !NardyProfile.look().photo) { $('look-file').click(); return; }
+    var patch = val.indexOf('medal:') === 0 ? { pic: 'medal', medal: val.slice(6) } : { pic: val };
+    NardyProfile.setLook(patch);
+    syncLook(patch);
+    lookSheet();
+    updateUI();
+  }
+
+  function syncLook(patch) {
+    if (!shared()) return;
+    NardyFB.saveMe(NardyAccount.user(), patch).then(null, noSync);
+  }
+
+  function noSync() { toast('В общий профиль не записалось — нет связи'); }
+
+  function aboutSheet() {
+    sheetKind = 'about';
+    openSheet(
+      '<h1>О себе</h1>' +
+      '<p class="lede">Пара слов для соперников. До 60 знаков.</p>' +
+      '<div class="field"><input class="inp" id="about-inp" maxlength="60" placeholder="Например: играю с детства, не обижайте" value="' +
+        esc(NardyProfile.look().about) + '"></div>' +
+      '<div class="sheet-actions"><button class="btn" type="button" data-act="home">Отмена</button>' +
+      '<button class="btn btn-key" type="button" data-act="about-save">Сохранить</button></div>'
+    );
+    var f = $('about-inp');
+    if (f) { f.focus(); f.addEventListener('keydown', function (e) { if (e.key === 'Enter') saveAbout(); }); }
+  }
+
+  function saveAbout() {
+    var f = $('about-inp');
+    var text = f ? f.value.replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+    NardyProfile.setLook({ about: text });
+    syncLook({ about: text });
+    homeSheet();
+  }
+
+  /* ---------- чужой профиль и счёт «кто кого» ---------- */
+
+  function headToHead(id, acc) {
+    var P = peopleStats(), i, f;
+    for (i = 0; i < P.foes.length; i++) {
+      f = P.foes[i];
+      if ((acc && (f.acc === acc || f.id === acc)) || f.id === id || f.id === 'n:' + id) return { w: f.w, l: f.l };
+    }
+    return { w: 0, l: 0 };
+  }
+
+  function foeSheet(id, acc, name) {
+    var h = headToHead(id, acc);
+    drawFoe(null, name, h, !!acc);
+    if (!acc || !window.NardyFB || !(NardyAccount.fb && NardyAccount.fb())) return;
+    NardyFB.profile(acc).then(function (p) {
+      if (sheet.dataset.kind === 'foe' && veil.classList.contains('show')) drawFoe(p, name, h, true);
+    }, function () {});
+  }
+
+  function drawFoe(p, name, h, hasAcc) {
+    var r = p ? NardyProfile.rank(p.w) : null;
+    sheetKind = 'foe';
+    openSheet(
+      '<div class="home">' +
+      '<div class="me">' +
+        '<span class="me-ava"><img alt="" id="foe-pic" src="' + esc(NardyProfile.medal((p && p.medal) || 'star', 160)) + '"></span>' +
+        '<div class="me-who">' +
+          '<h1>' + esc((p && p.name) || name || 'Соперник') + '</h1>' +
+          (r ? '<div class="rank"><b>' + r.name + '</b></div>' : '') +
+          (p && p.about ? '<div class="about">«' + esc(p.about) + '»</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="field"><label>Кто кого</label><div class="h2h"><b class="mono">' + h.w + ' : ' + h.l + '</b>' +
+        '<span>вы — ' + esc((p && p.name) || name || 'соперник') + '</span></div></div>' +
+      (p
+        ? '<div class="field"><label>С людьми</label>' + statsGrid(p) + '</div>' +
+          '<div class="field"><label>Наколки</label>' + badgesRow(p.badges) + '</div>'
+        : '<p class="lede">' + (hasAcc ? 'Загружаем…' : 'Играет без Telegram — общего профиля нет.') + '</p>') +
+      '<div class="sheet-actions"><button class="btn" type="button" data-act="' + (S ? 'close' : 'home') + '">' + (S ? 'К доске' : 'Назад') + '</button>' +
+      (isNet() ? '' : '<button class="btn btn-key" type="button" data-act="play-net">Позвать сыграть</button>') + '</div>' +
+      '</div>'
+    );
+    if (p) {
+      var img = $('foe-pic');
+      if (p.pic === 'photo' && p.id) {
+        NardyFB.photoOf(p.id).then(function (src) { if (src && img) img.src = src; });
+      } else if (p.pic !== 'medal' && p.photo) {
+        img.src = p.photo;
+      }
+    }
   }
 
   function rematch() {
@@ -1415,7 +1674,7 @@
     var t = toss(), st = N.create();
     st.turn = t.turn;
     net.shown = false;
-    bf = {}; recorded = false; NardyBanter.reset();
+    bf = {}; sixes = { w: 0, b: 0 }; recorded = false; NardyBanter.reset();
     hushQuip();
     net.toss = null;
     net.mineOffer = 0;
@@ -1445,7 +1704,7 @@
     save();
     busy = true;
     if (!silent) { S = null; VIS = visFrom(N.create()); buildMen(); place(true); rows = []; renderLog(); updateUI(); }
-    setupSheet();
+    homeSheet();
   }
 
   /* ---------- диалоги ---------- */
@@ -1480,9 +1739,8 @@
 
   function setupSheet() {
     openSheet(
-      '<h1>Длинные нарды</h1>' +
-      '<p class="lede">Пятнадцать шашек стоят на голове, идут по кругу в свой дом и уходят с доски. ' +
-      'Шашки не бьют — их запирают.</p>' +
+      '<h1>Настройки</h1>' +
+      '<p class="lede">С кем играть и как — запомнится до следующего раза.</p>' +
       '<div class="field"><label>Соперник</label>' +
       segHTML('mode', [['ai', 'Компьютер'], ['duo', 'Вдвоём'], ['net', 'По сети']], opts.mode) +
       '<p class="hint" id="net-hint"></p></div>' +
@@ -1496,8 +1754,7 @@
       (S && !S.winner ? '<p class="hint">Партия идёт. Начнёте новую — счёт матча ' +
         tally.w + ' : ' + tally.b + ' сохранится.</p>' : '') +
       '<div class="sheet-actions">' +
-      '<button class="btn" type="button" data-act="profile">Профиль</button>' +
-      '<button class="btn" type="button" data-act="rules">Правила</button>' +
+      '<button class="btn" type="button" data-act="home">Назад</button>' +
       (saved
         ? '<button class="btn" type="button" data-act="start">Заново</button>' +
           '<button class="btn btn-key" type="button" data-act="resume">Продолжить</button>'
@@ -1779,7 +2036,7 @@
     if (opts.mode === 'net' && !net.code) { netSheet(); return; }
     closeSheet();
     hushQuip();
-    bf = {}; recorded = false; NardyBanter.reset();
+    bf = {}; sixes = { w: 0, b: 0 }; recorded = false; NardyBanter.reset();
     forget();
     S = N.create();
     VIS = visFrom(S);
@@ -1814,9 +2071,14 @@
   lZones.addEventListener('pointercancel', onCancel);
   lSpots.addEventListener('pointerdown', onDown);
 
-  $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : setupSheet(); });
-  ['pl-w', 'pl-b'].forEach(function (id) {
-    $(id).addEventListener('click', function () { if (!busy || S) profileSheet(); });
+  $('act-new').addEventListener('click', function () { isNet() ? tableSheet() : homeSheet(); });
+  /* своя табличка — свой профиль, табличка соперника по сети — его профиль */
+  ['w', 'b'].forEach(function (p) {
+    $('pl-' + p).addEventListener('click', function () {
+      var seat = isNet() && net.table && net.table.seats ? net.table.seats[p] : null;
+      if (seat && p !== net.seat) { foeSheet(seat.id, seat.acc, seat.name); return; }
+      homeSheet();
+    });
   });
   $('act-undo').addEventListener('click', function () { undo(); });
   $('act-sound').addEventListener('click', function () {
@@ -1839,24 +2101,35 @@
       syncSetup();
       return;
     }
-    var act = e.target.dataset ? e.target.dataset.act : null;
+    var el = e.target.closest ? e.target.closest('[data-act]') : e.target;
+    var act = el && el.dataset ? el.dataset.act : null;
     if (act === 'start') newGame();
     else if (act === 'again') { isNet() ? rematch() : newGame(); }
     else if (act === 'resume') resume();
     else if (act === 'net-new') { saveName(); createTable(); }
-    else if (act === 'net-sit') { saveName(); sitDown(e.target.dataset.code); }
+    else if (act === 'net-sit') { saveName(); sitDown(el.dataset.code); }
     else if (act === 'net-join') { saveName(); sitDown($('net-code') ? $('net-code').value : ''); }
     else if (act === 'net-quit') quitTable();
     else if (act === 'net-restart') offerRestart();
-    else if (act === 'profile') profileSheet();
+    else if (act === 'profile' || act === 'home') homeSheet();
+    else if (act === 'setup') setupSheet();
+    else if (act === 'play-ai') { opts.mode = 'ai'; save(); newGame(); }
+    else if (act === 'play-duo') { opts.mode = 'duo'; save(); newGame(); }
+    else if (act === 'play-net') { opts.mode = 'net'; save(); netSheet(); }
+    else if (act === 'foe') foeSheet(el.dataset.id, el.dataset.acc, el.dataset.name);
+    else if (act === 'look') lookSheet();
+    else if (act === 'look-pick') pickLook(el.dataset.v);
+    else if (act === 'look-upload') { var lf = $('look-file'); if (lf) lf.click(); }
+    else if (act === 'about') aboutSheet();
+    else if (act === 'about-save') saveAbout();
+    else if (act === 'home-add') NardyTG.addHome();
     else if (act === 'login') doLogin();
     else if (act === 'top') topSheet();
     else if (act === 'logout') { NardyAccount.logout(); loginSheet(); }
-    else if (act === 'stats-reset') { NardyStats.reset(); profileSheet(); }
     else if (act === 'offer-yes') answerOffer(true);
     else if (act === 'offer-no') answerOffer(false);
     else if (act === 'net-share') {
-      if (!NardyTG.invite(net.code, 'Партию в нарды? Стол ' + net.code)) toast('Не вышло открыть чат');
+      if (!NardyTG.invite(net.code, 'Тебя зовёт ' + meInfo().name + ' поиграть в нарды')) toast('Не вышло открыть чат');
     }
     else if (act === 'net-copy') {
       var f = $('net-link');
@@ -1870,9 +2143,9 @@
         }
       }
     }
-    else if (act === 'back') { opts.mode = 'ai'; save(); setupSheet(); }
+    else if (act === 'back') { opts.mode = 'ai'; save(); homeSheet(); }
     else if (act === 'rules') rulesSheet();
-    else if (act === 'close') { if (S) closeSheet(); else setupSheet(); }
+    else if (act === 'close') { if (S) closeSheet(); else homeSheet(); }
     else if (act === 'reset') { tally = { w: 0, b: 0 }; save(); updateUI(); newGame(); }
   });
 
@@ -1929,14 +2202,14 @@
   buildMen();
   place(true);
   updateUI();
-  if (NardyAccount.signed()) setupSheet(); else loginSheet();
+  if (NardyAccount.signed()) homeSheet(); else loginSheet();
 
   /* Сеть подключается отдельно: страница обязана работать и без неё */
   NardyNet.connect().then(function (db) {
     net.ready = !!db;
     syncSetup();
     if (!db) {
-      if (opts.mode === 'net') { opts.mode = 'ai'; save(); setupSheet(); }
+      if (opts.mode === 'net') { opts.mode = 'ai'; save(); homeSheet(); }
       return;
     }
     var invite = readInvite();
@@ -1957,7 +2230,7 @@
       var seat = t && t.seats && t.seats[back.seat];
       if (!seat || seat.id !== NardyNet.id()) {
         try { localStorage.removeItem('nardy.net'); } catch (e) {}
-        if (opts.mode === 'net') { opts.mode = 'ai'; save(); setupSheet(); }
+        if (opts.mode === 'net') { opts.mode = 'ai'; save(); homeSheet(); }
         return;
       }
       net.seat = back.seat;

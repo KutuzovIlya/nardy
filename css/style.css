@@ -24,6 +24,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -631,6 +633,157 @@ button { font: inherit; color: inherit; }
 .tables span { color: var(--text-dim); margin-right: auto; }
 .tables .btn { padding: 6px 13px; font-size: 12px; }
 .tables .dim { color: var(--text-dim); margin-right: 0; font-variant-numeric: tabular-nums; }
+
+/* ---------- профиль: главный экран ---------- */
+
+.home .me { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+
+.me-ava {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--panel-2);
+  box-shadow: 0 0 0 2px #1A120B, 0 0 0 3.5px rgba(200, 162, 74, .6), 0 10px 22px rgba(0, 0, 0, .6);
+  cursor: pointer;
+}
+
+.me-ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.me-who { min-width: 0; }
+
+.home .me-who h1 {
+  margin: 0;
+  font-size: 24px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank { font-size: 12px; color: var(--text-dim); }
+.rank b { color: var(--brass-lit); font-weight: 500; letter-spacing: .05em; }
+
+.about {
+  display: block;
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: italic 13px/1.35 "IBM Plex Sans", system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.about.empty { color: var(--text-dim); font-style: normal; text-decoration: underline dotted; text-underline-offset: 3px; }
+
+.play { display: grid; gap: 8px; margin-bottom: 18px; }
+.play .btn { padding: 13px 10px; font-size: 14px; border-radius: var(--radius); }
+.play-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.linkish {
+  justify-self: center;
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  color: var(--text-dim);
+  font-size: 12px;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+.stats div {
+  padding: 8px 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.stats b { display: block; font: 500 17px "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 10px; color: var(--text-dim); }
+
+/* наколки: полученные — латунь на тёмном дереве, ещё не полученные — пунктиром */
+.badges { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+
+.badge {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  text-align: center;
+  font-size: 9.5px;
+  line-height: 1.15;
+  color: var(--text-dim);
+}
+
+.badge i {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px dashed rgba(200, 162, 74, .3);
+  color: rgba(200, 162, 74, .32);
+  font: normal 22px Forum, Georgia, "Apple Symbols", serif;
+}
+
+.badge.got { color: var(--text); }
+
+.badge.got i {
+  border: 0;
+  background: radial-gradient(circle at 35% 30%, #5A3B22, #1E120A);
+  color: var(--brass-lit);
+  box-shadow: 0 0 0 1.5px var(--brass), 0 6px 14px rgba(0, 0, 0, .5);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .6);
+}
+
+.tables li.tap { cursor: pointer; }
+.tables b.won { color: var(--brass-lit); }
+.tables b.lost { color: var(--text-dim); }
+
+.h2h { display: flex; align-items: baseline; gap: 12px; }
+.h2h b { font-size: 30px; font-weight: 500; color: var(--brass-lit); }
+.h2h span { color: var(--text-dim); font-size: 13px; }
+
+/* выбор лица */
+.looks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 10px; }
+
+.look-pick {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.look-pick img, .look-pick i {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font: normal 28px Forum, Georgia, serif;
+  color: var(--brass);
+  border: 1px dashed rgba(200, 162, 74, .4);
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow .2s;
+}
+
+.look-pick img { border: 0; }
+.look-pick[aria-pressed="true"] img, .look-pick[aria-pressed="true"] i { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--brass-lit); }
+.look-pick[aria-pressed="true"] { color: var(--text); }
 
 .bro {
   display: inline-block;

@@ -117,6 +117,18 @@
 
   function close() { if (on) { try { W.close(); } catch (e) {} } }
 
+  /* Значок на экран «Домой»: Telegram сам покажет системное окно,
+     человек нажмёт «Добавить». Без его согласия значок не поставить. */
+  function homeScreen(cb) {
+    if (!on || !W.addToHomeScreen || !W.checkHomeScreenStatus) { cb('unsupported'); return; }
+    try { W.checkHomeScreenStatus(function (status) { cb(status || 'unknown'); }); }
+    catch (e) { cb('unsupported'); }
+  }
+
+  function addHome() {
+    try { if (on && W.addToHomeScreen) W.addToHomeScreen(); } catch (e) {}
+  }
+
   global.NardyTG = {
     on: on,
     bot: function () { return BOT; },
@@ -130,6 +142,8 @@
     deepLink: deepLink,
     invite: invite,
     close: close,
+    homeScreen: homeScreen,
+    addHome: addHome,
     platform: on ? W.platform : ''
   };
 })(window);
