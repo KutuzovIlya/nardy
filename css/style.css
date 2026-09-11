@@ -1,7 +1,8 @@
 /* ============================================================
-   Нарды. Свёрстано под телефон: экран делится на три полосы —
-   соперник сверху, доска посередине во всю оставшуюся высоту,
-   вы снизу. На большом экране раскладка та же, просто шире.
+   Нарды. Свёрстано под телефон «к большому пальцу»: соперник,
+   доска, вы и полоса кнопок — всё прижато к низу экрана, куда
+   дотягивается палец одной руки; пустое место уходит наверх.
+   На большом экране раскладка та же, просто шире.
    ============================================================ */
 
 :root {
@@ -62,61 +63,6 @@ button { font: inherit; color: inherit; }
   height: var(--tgh, 100dvh);
 }
 
-/* ---------- верхняя планка ---------- */
-
-.rail {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-
-.mark {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-family: Forum, Georgia, serif;
-  font-size: 20px;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  line-height: 1;
-}
-
-.mark em {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-style: normal;
-  font-size: 9px;
-  letter-spacing: .28em;
-  text-transform: uppercase;
-  color: var(--brass);
-}
-
-.tally {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.tally b { font-size: 16px; font-weight: 500; color: var(--text); }
-
-.chip {
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 10px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--brass);
-  white-space: nowrap;
-}
-
-.rail-actions { display: flex; gap: 6px; }
-
 /* ---------- кнопки ---------- */
 
 .btn {
@@ -134,16 +80,6 @@ button { font: inherit; color: inherit; }
 .btn:active:not(:disabled) { transform: scale(.96); }
 .btn:disabled { opacity: .32; }
 .btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
-
-.btn-icon {
-  width: 38px;
-  padding: 0;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  line-height: 1;
-}
 
 .btn-key {
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
@@ -164,8 +100,45 @@ button { font: inherit; color: inherit; }
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: var(--gap);
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------- нижняя полоса: партия, отмена, счёт, звук ---------- */
+
+.bar {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.5fr 1fr;
+  gap: 6px;
+}
+
+.bar .btn {
+  height: 46px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.bar #act-undo, .bar #act-sound { font-size: 18px; line-height: 1; }
+
+.score {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+  line-height: 1.05;
+}
+
+.score b { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.score > span {
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
 .stage {
@@ -397,7 +370,7 @@ button { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 9px 13px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -427,7 +400,10 @@ button { font: inherit; color: inherit; }
 
 .pname {
   font-family: Forum, Georgia, serif;
-  font-size: 19px;
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   letter-spacing: .07em;
   text-transform: uppercase;
   line-height: 1.15;
@@ -441,11 +417,29 @@ button { font: inherit; color: inherit; }
   text-overflow: ellipsis;
 }
 
-/* аватарка: фото из Telegram, иначе шашка своего цвета */
+/* аватарка: фото из Telegram, иначе шашка своего цвета.
+   Вокруг — латунное кольцо: сколько осталось времени на ход */
+.ava-ring { position: relative; flex: none; width: 40px; height: 40px; }
+
+.ring {
+  position: absolute;
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  opacity: 0;
+  transition: opacity .25s;
+}
+
+.ring circle { fill: none; stroke-width: 3; }
+.ring .track { stroke: rgba(200, 162, 74, .18); }
+.ring .left { stroke: var(--brass-lit); stroke-linecap: round; stroke-dasharray: 150.8 150.8; transition: stroke-dasharray .5s linear; }
+.plaque.clocked .ring { opacity: 1; }
+.plaque.hurry .ring .left { stroke: #E07A5F; }
+
 .ava {
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   flex: none;
   border-radius: 50%;
   overflow: hidden;
@@ -460,7 +454,8 @@ button { font: inherit; color: inherit; }
 .turn {
   margin-left: auto;
   flex: none;
-  padding: 4px 11px;
+  padding: 5px 11px;
+  font-variant-numeric: tabular-nums;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
   color: #14100A;
@@ -683,16 +678,12 @@ button { font: inherit; color: inherit; }
 
 /* ---------- совсем узкие экраны ---------- */
 
-/* на телефоне название не нужно — его показывает сам Telegram */
 @media (max-width: 560px) {
-  .mark { display: none; }
-  .tally { margin-left: 0; margin-right: auto; }
   .app { padding-left: calc(6px + env(safe-area-inset-left)); padding-right: calc(6px + env(safe-area-inset-right)); }
 }
 
 @media (max-width: 380px) {
   .btn { padding: 8px 11px; font-size: 12px; }
-  .btn-icon { width: 34px; height: 34px; }
   .pstats { gap: 10px; }
 }
 
@@ -700,6 +691,7 @@ button { font: inherit; color: inherit; }
   .plaque { padding: 6px 11px; }
   .pname { font-size: 15px; }
   .pmeta { display: none; }
+  .bar .btn { height: 40px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

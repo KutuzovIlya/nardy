@@ -9,37 +9,24 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Forum&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=34">
+<link rel="stylesheet" href="css/style.css?v=35">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 <div class="app">
 
-  <header class="rail">
-    <div class="mark">Нарды <em>длинные</em></div>
-
-    <div class="tally">
-      <span class="chip" id="net-chip" hidden></span>
-      <b id="tally-w">0</b>
-      <span>:</span>
-      <b id="tally-b">0</b>
-    </div>
-
-    <nav class="rail-actions">
-      <button class="btn btn-icon" id="act-undo" type="button" title="Отменить ход" aria-label="Отменить ход">↶</button>
-      <button class="btn btn-icon" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
-      <button class="btn btn-key" id="act-new" type="button">Партия</button>
-    </nav>
-  </header>
-
+  <!-- Раскладка «к большому пальцу»: всё нужное внизу, пустое место уходит наверх -->
   <main class="table">
     <div class="plaque" id="pl-b">
-      <span class="ava" id="ava-b"><span class="disc b"></span></span>
+      <span class="ava-ring">
+        <span class="ava" id="ava-b"><span class="disc b"></span></span>
+        <svg class="ring" viewBox="0 0 52 52" aria-hidden="true"><circle class="track" cx="26" cy="26" r="24"/><circle class="left" id="ring-b" cx="26" cy="26" r="24" transform="rotate(-90 26 26)"/></svg>
+      </span>
       <div class="pwho">
-        <div class="pname">Чёрные</div>
-        <div class="pmeta" id="meta-b">Компьютер</div>
+        <div class="pname" id="name-b">Компьютер</div>
+        <div class="pmeta" id="meta-b">чёрные</div>
       </div>
-      <span class="turn">ходит</span>
+      <span class="turn" id="turn-b">ходит</span>
     </div>
 
     <div class="stage" id="stage">
@@ -55,14 +42,27 @@
     </div>
 
     <div class="plaque" id="pl-w">
-      <span class="ava" id="ava-w"><span class="disc w"></span></span>
+      <span class="ava-ring">
+        <span class="ava" id="ava-w"><span class="disc w"></span></span>
+        <svg class="ring" viewBox="0 0 52 52" aria-hidden="true"><circle class="track" cx="26" cy="26" r="24"/><circle class="left" id="ring-w" cx="26" cy="26" r="24" transform="rotate(-90 26 26)"/></svg>
+      </span>
       <div class="pwho">
-        <div class="pname">Белые</div>
-        <div class="pmeta" id="meta-w">Игрок</div>
+        <div class="pname" id="name-w">Игрок</div>
+        <div class="pmeta" id="meta-w">белые</div>
       </div>
-      <span class="turn">ходит</span>
+      <span class="turn" id="turn-w">ходит</span>
     </div>
   </main>
+
+  <nav class="bar">
+    <button class="btn btn-key" id="act-new" type="button">Партия</button>
+    <button class="btn" id="act-undo" type="button" title="Отменить ход" aria-label="Отменить ход">↶</button>
+    <div class="score" id="score" aria-label="Счёт матча">
+      <b class="mono"><span id="tally-a">0</span> : <span id="tally-z">0</span></b>
+      <span id="score-sub">счёт</span>
+    </div>
+    <button class="btn" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
+  </nav>
 
 </div>
 
@@ -70,18 +70,18 @@
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Меню"></div>
 </div>
 
-<script src="js/mock-db.js?v=34"></script>
-<script src="js/engine.js?v=34"></script>
-<script src="js/ai.js?v=34"></script>
-<script src="js/table.js?v=34"></script>
-<script src="js/board.js?v=34"></script>
-<script src="js/dicefx.js?v=34"></script>
-<script src="js/banter.js?v=34"></script>
-<script src="js/stats.js?v=34"></script>
-<script src="js/account.js?v=34"></script>
-<script src="js/tg.js?v=34"></script>
-<script src="js/fb.js?v=34"></script>
-<script src="js/net.js?v=34"></script>
-<script src="js/ui.js?v=34"></script>
+<script src="js/mock-db.js?v=35"></script>
+<script src="js/engine.js?v=35"></script>
+<script src="js/ai.js?v=35"></script>
+<script src="js/table.js?v=35"></script>
+<script src="js/board.js?v=35"></script>
+<script src="js/dicefx.js?v=35"></script>
+<script src="js/banter.js?v=35"></script>
+<script src="js/stats.js?v=35"></script>
+<script src="js/account.js?v=35"></script>
+<script src="js/tg.js?v=35"></script>
+<script src="js/fb.js?v=35"></script>
+<script src="js/net.js?v=35"></script>
+<script src="js/ui.js?v=35"></script>
 </body>
 </html>

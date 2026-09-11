@@ -6,9 +6,10 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Forum&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* ============================================================
-   Нарды. Свёрстано под телефон: экран делится на три полосы —
-   соперник сверху, доска посередине во всю оставшуюся высоту,
-   вы снизу. На большом экране раскладка та же, просто шире.
+   Нарды. Свёрстано под телефон «к большому пальцу»: соперник,
+   доска, вы и полоса кнопок — всё прижато к низу экрана, куда
+   дотягивается палец одной руки; пустое место уходит наверх.
+   На большом экране раскладка та же, просто шире.
    ============================================================ */
 
 :root {
@@ -69,61 +70,6 @@ button { font: inherit; color: inherit; }
   height: var(--tgh, 100dvh);
 }
 
-/* ---------- верхняя планка ---------- */
-
-.rail {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-
-.mark {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-family: Forum, Georgia, serif;
-  font-size: 20px;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  line-height: 1;
-}
-
-.mark em {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-style: normal;
-  font-size: 9px;
-  letter-spacing: .28em;
-  text-transform: uppercase;
-  color: var(--brass);
-}
-
-.tally {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.tally b { font-size: 16px; font-weight: 500; color: var(--text); }
-
-.chip {
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 10px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--brass);
-  white-space: nowrap;
-}
-
-.rail-actions { display: flex; gap: 6px; }
-
 /* ---------- кнопки ---------- */
 
 .btn {
@@ -141,16 +87,6 @@ button { font: inherit; color: inherit; }
 .btn:active:not(:disabled) { transform: scale(.96); }
 .btn:disabled { opacity: .32; }
 .btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
-
-.btn-icon {
-  width: 38px;
-  padding: 0;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  line-height: 1;
-}
 
 .btn-key {
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
@@ -171,8 +107,45 @@ button { font: inherit; color: inherit; }
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: var(--gap);
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------- нижняя полоса: партия, отмена, счёт, звук ---------- */
+
+.bar {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.5fr 1fr;
+  gap: 6px;
+}
+
+.bar .btn {
+  height: 46px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.bar #act-undo, .bar #act-sound { font-size: 18px; line-height: 1; }
+
+.score {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+  line-height: 1.05;
+}
+
+.score b { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.score > span {
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
 .stage {
@@ -404,7 +377,7 @@ button { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 9px 13px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -434,7 +407,10 @@ button { font: inherit; color: inherit; }
 
 .pname {
   font-family: Forum, Georgia, serif;
-  font-size: 19px;
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   letter-spacing: .07em;
   text-transform: uppercase;
   line-height: 1.15;
@@ -448,11 +424,29 @@ button { font: inherit; color: inherit; }
   text-overflow: ellipsis;
 }
 
-/* аватарка: фото из Telegram, иначе шашка своего цвета */
+/* аватарка: фото из Telegram, иначе шашка своего цвета.
+   Вокруг — латунное кольцо: сколько осталось времени на ход */
+.ava-ring { position: relative; flex: none; width: 40px; height: 40px; }
+
+.ring {
+  position: absolute;
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  opacity: 0;
+  transition: opacity .25s;
+}
+
+.ring circle { fill: none; stroke-width: 3; }
+.ring .track { stroke: rgba(200, 162, 74, .18); }
+.ring .left { stroke: var(--brass-lit); stroke-linecap: round; stroke-dasharray: 150.8 150.8; transition: stroke-dasharray .5s linear; }
+.plaque.clocked .ring { opacity: 1; }
+.plaque.hurry .ring .left { stroke: #E07A5F; }
+
 .ava {
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   flex: none;
   border-radius: 50%;
   overflow: hidden;
@@ -467,7 +461,8 @@ button { font: inherit; color: inherit; }
 .turn {
   margin-left: auto;
   flex: none;
-  padding: 4px 11px;
+  padding: 5px 11px;
+  font-variant-numeric: tabular-nums;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--brass-lit), var(--brass));
   color: #14100A;
@@ -690,16 +685,12 @@ button { font: inherit; color: inherit; }
 
 /* ---------- совсем узкие экраны ---------- */
 
-/* на телефоне название не нужно — его показывает сам Telegram */
 @media (max-width: 560px) {
-  .mark { display: none; }
-  .tally { margin-left: 0; margin-right: auto; }
   .app { padding-left: calc(6px + env(safe-area-inset-left)); padding-right: calc(6px + env(safe-area-inset-right)); }
 }
 
 @media (max-width: 380px) {
   .btn { padding: 8px 11px; font-size: 12px; }
-  .btn-icon { width: 34px; height: 34px; }
   .pstats { gap: 10px; }
 }
 
@@ -707,6 +698,7 @@ button { font: inherit; color: inherit; }
   .plaque { padding: 6px 11px; }
   .pname { font-size: 15px; }
   .pmeta { display: none; }
+  .bar .btn { height: 40px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -715,31 +707,18 @@ button { font: inherit; color: inherit; }
 </style>
 <div class="app">
 
-  <header class="rail">
-    <div class="mark">Нарды <em>длинные</em></div>
-
-    <div class="tally">
-      <span class="chip" id="net-chip" hidden></span>
-      <b id="tally-w">0</b>
-      <span>:</span>
-      <b id="tally-b">0</b>
-    </div>
-
-    <nav class="rail-actions">
-      <button class="btn btn-icon" id="act-undo" type="button" title="Отменить ход" aria-label="Отменить ход">↶</button>
-      <button class="btn btn-icon" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
-      <button class="btn btn-key" id="act-new" type="button">Партия</button>
-    </nav>
-  </header>
-
+  <!-- Раскладка «к большому пальцу»: всё нужное внизу, пустое место уходит наверх -->
   <main class="table">
     <div class="plaque" id="pl-b">
-      <span class="ava" id="ava-b"><span class="disc b"></span></span>
+      <span class="ava-ring">
+        <span class="ava" id="ava-b"><span class="disc b"></span></span>
+        <svg class="ring" viewBox="0 0 52 52" aria-hidden="true"><circle class="track" cx="26" cy="26" r="24"/><circle class="left" id="ring-b" cx="26" cy="26" r="24" transform="rotate(-90 26 26)"/></svg>
+      </span>
       <div class="pwho">
-        <div class="pname">Чёрные</div>
-        <div class="pmeta" id="meta-b">Компьютер</div>
+        <div class="pname" id="name-b">Компьютер</div>
+        <div class="pmeta" id="meta-b">чёрные</div>
       </div>
-      <span class="turn">ходит</span>
+      <span class="turn" id="turn-b">ходит</span>
     </div>
 
     <div class="stage" id="stage">
@@ -755,14 +734,27 @@ button { font: inherit; color: inherit; }
     </div>
 
     <div class="plaque" id="pl-w">
-      <span class="ava" id="ava-w"><span class="disc w"></span></span>
+      <span class="ava-ring">
+        <span class="ava" id="ava-w"><span class="disc w"></span></span>
+        <svg class="ring" viewBox="0 0 52 52" aria-hidden="true"><circle class="track" cx="26" cy="26" r="24"/><circle class="left" id="ring-w" cx="26" cy="26" r="24" transform="rotate(-90 26 26)"/></svg>
+      </span>
       <div class="pwho">
-        <div class="pname">Белые</div>
-        <div class="pmeta" id="meta-w">Игрок</div>
+        <div class="pname" id="name-w">Игрок</div>
+        <div class="pmeta" id="meta-w">белые</div>
       </div>
-      <span class="turn">ходит</span>
+      <span class="turn" id="turn-w">ходит</span>
     </div>
   </main>
+
+  <nav class="bar">
+    <button class="btn btn-key" id="act-new" type="button">Партия</button>
+    <button class="btn" id="act-undo" type="button" title="Отменить ход" aria-label="Отменить ход">↶</button>
+    <div class="score" id="score" aria-label="Счёт матча">
+      <b class="mono"><span id="tally-a">0</span> : <span id="tally-z">0</span></b>
+      <span id="score-sub">счёт</span>
+    </div>
+    <button class="btn" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
+  </nav>
 
 </div>
 
@@ -4593,23 +4585,23 @@ button { font: inherit; color: inherit; }
     toast._t = setTimeout(function () { t.classList.remove('show'); }, ms || 1900);
   }
 
+  /* Чей цвет «мой» на этом экране: он снизу, его счёт — первым */
+  function myColor() { return isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : null); }
+
   function updateUI() {
     if (!S) return;
-    $('tally-w').textContent = tally.w;
-    $('tally-b').textContent = tally.b;
-    var chip = $('net-chip');
-    chip.hidden = !isNet();
-    if (isNet()) chip.textContent = 'стол ' + net.code;
-    $('pl-w').classList.toggle('act', !S.winner && S.turn === 'w');
-    $('pl-b').classList.toggle('act', !S.winner && S.turn === 'b');
-    var lvl = { easy: 'Новичок', normal: 'Опытный', hard: 'Мастер' }[opts.level];
-    if (isNet()) {
-      $('meta-w').textContent = seatLabel('w');
-      $('meta-b').textContent = seatLabel('b');
-    } else {
-      $('meta-w').textContent = isAI('w') ? 'Компьютер · ' + lvl : 'Игрок';
-      $('meta-b').textContent = isAI('b') ? 'Компьютер · ' + lvl : 'Игрок';
-    }
+    var me = myColor(), a = me || 'w', z = N.opp(a);
+    $('tally-a').textContent = tally[a];
+    $('tally-z').textContent = tally[z];
+    var to = auth() && net.table && net.table.opts ? net.table.opts.to : 0;
+    $('score-sub').textContent = to ? 'до ' + to : 'счёт';
+    ['w', 'b'].forEach(function (p) {
+      var who = plate(p);
+      $('name-' + p).textContent = who.name;
+      $('meta-' + p).textContent = who.meta;
+      $('pl-' + p).classList.toggle('act', !S.winner && S.turn === p);
+    });
+    paintClock();
     var my = canPlay();
     $('act-undo').disabled = !(my && undoStack.length);
     setSides();
@@ -4617,6 +4609,43 @@ button { font: inherit; color: inherit; }
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
     $('act-sound').textContent = opts.sound ? '♪' : '✕';
     $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
+  }
+
+  /* Что написано на табличке игрока: имя крупно, под ним цвет и состояние */
+  function plate(p) {
+    var color = p === 'w' ? 'белые' : 'чёрные';
+    if (isNet()) {
+      var seat = net.table && net.table.seats ? net.table.seats[p] : null;
+      if (!seat) return { name: 'Место свободно', meta: color + ' · ждём соперника' };
+      if (seat.id === NardyNet.id()) return { name: seat.name || 'Вы', meta: color + ' · вы' };
+      var tag = NardyNet.hasRoom() ? (oppOnline(p) ? ' · в сети' : ' · не в сети') : '';
+      return { name: seat.name || 'Соперник', meta: color + tag };
+    }
+    if (isAI(p)) {
+      var lvl = { easy: 'новичок', normal: 'опытный', hard: 'мастер' }[opts.level];
+      return { name: 'Компьютер', meta: color + ' · ' + lvl };
+    }
+    if (opts.mode === 'ai') {
+      var u = NardyAccount.user();
+      return { name: (u && u.name) || NardyNet.name() || 'Вы', meta: color };
+    }
+    return { name: p === 'w' ? 'Белые' : 'Чёрные', meta: 'игрок' };
+  }
+
+  /* Часы хода: «ходит · 0:42» и кольцо вокруг аватарки того, чей ход */
+  var RING = 2 * Math.PI * 24;
+  function paintClock() {
+    var ms = clockLeft(), full = NardyTable.LIMITS.move;
+    ['w', 'b'].forEach(function (p) {
+      var on = ms >= 0 && S && !S.winner && S.turn === p;
+      $('pl-' + p).classList.toggle('clocked', on);
+      $('pl-' + p).classList.toggle('hurry', on && ms <= 10000);
+      $('turn-' + p).textContent = on ? 'ходит · ' + clockText(ms) : 'ходит';
+      if (on) {
+        var frac = Math.max(0, Math.min(1, ms / full));
+        $('ring-' + p).style.strokeDasharray = (frac * RING).toFixed(1) + ' ' + RING.toFixed(1);
+      }
+    });
   }
 
   /* Аватарка: фото из Telegram у людей, резная шашка у компьютера */
@@ -4940,17 +4969,6 @@ button { font: inherit; color: inherit; }
 
   /* ---------- игра по сети ---------- */
 
-  /* Подпись под именем (идёт в textContent — экранировать не нужно) */
-  function seatLabel(p) {
-    var who = net.table && net.table.seats ? net.table.seats[p] : null;
-    if (!who) return 'место свободно';
-    var ms = clockLeft();
-    var clock = ms >= 0 && S.turn === p ? ' · ' + clockText(ms) : '';
-    if (who.id === NardyNet.id()) return (who.name || 'Игрок') + ' · вы' + clock;
-    var tag = NardyNet.hasRoom() ? (oppOnline(p) ? ' · в сети' : ' · не в сети') : '';
-    return (who.name || 'Игрок') + (clock || tag);
-  }
-
   function oppOnline(p) {
     var t = net.table;
     if (t && t.seen) return !!t.seen[p] && t.now - t.seen[p] < 45000;
@@ -5200,7 +5218,7 @@ button { font: inherit; color: inherit; }
   setInterval(function () {
     var ms = clockLeft();
     if (ms < 0) return;
-    $('meta-' + S.turn).textContent = seatLabel(S.turn);
+    paintClock();
     if (S.turn === net.seat && ms <= 10000 && ms > 0 && net.warned !== net.turnKey) {
       net.warned = net.turnKey;
       NardyTG.buzz('lose');

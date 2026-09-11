@@ -435,23 +435,23 @@
     toast._t = setTimeout(function () { t.classList.remove('show'); }, ms || 1900);
   }
 
+  /* Чей цвет «мой» на этом экране: он снизу, его счёт — первым */
+  function myColor() { return isNet() ? net.seat : (opts.mode === 'ai' ? opts.human : null); }
+
   function updateUI() {
     if (!S) return;
-    $('tally-w').textContent = tally.w;
-    $('tally-b').textContent = tally.b;
-    var chip = $('net-chip');
-    chip.hidden = !isNet();
-    if (isNet()) chip.textContent = 'стол ' + net.code;
-    $('pl-w').classList.toggle('act', !S.winner && S.turn === 'w');
-    $('pl-b').classList.toggle('act', !S.winner && S.turn === 'b');
-    var lvl = { easy: 'Новичок', normal: 'Опытный', hard: 'Мастер' }[opts.level];
-    if (isNet()) {
-      $('meta-w').textContent = seatLabel('w');
-      $('meta-b').textContent = seatLabel('b');
-    } else {
-      $('meta-w').textContent = isAI('w') ? 'Компьютер · ' + lvl : 'Игрок';
-      $('meta-b').textContent = isAI('b') ? 'Компьютер · ' + lvl : 'Игрок';
-    }
+    var me = myColor(), a = me || 'w', z = N.opp(a);
+    $('tally-a').textContent = tally[a];
+    $('tally-z').textContent = tally[z];
+    var to = auth() && net.table && net.table.opts ? net.table.opts.to : 0;
+    $('score-sub').textContent = to ? 'до ' + to : 'счёт';
+    ['w', 'b'].forEach(function (p) {
+      var who = plate(p);
+      $('name-' + p).textContent = who.name;
+      $('meta-' + p).textContent = who.meta;
+      $('pl-' + p).classList.toggle('act', !S.winner && S.turn === p);
+    });
+    paintClock();
     var my = canPlay();
     $('act-undo').disabled = !(my && undoStack.length);
     setSides();
@@ -459,6 +459,43 @@
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
     $('act-sound').textContent = opts.sound ? '♪' : '✕';
     $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
+  }
+
+  /* Что написано на табличке игрока: имя крупно, под ним цвет и состояние */
+  function plate(p) {
+    var color = p === 'w' ? 'белые' : 'чёрные';
+    if (isNet()) {
+      var seat = net.table && net.table.seats ? net.table.seats[p] : null;
+      if (!seat) return { name: 'Место свободно', meta: color + ' · ждём соперника' };
+      if (seat.id === NardyNet.id()) return { name: seat.name || 'Вы', meta: color + ' · вы' };
+      var tag = NardyNet.hasRoom() ? (oppOnline(p) ? ' · в сети' : ' · не в сети') : '';
+      return { name: seat.name || 'Соперник', meta: color + tag };
+    }
+    if (isAI(p)) {
+      var lvl = { easy: 'новичок', normal: 'опытный', hard: 'мастер' }[opts.level];
+      return { name: 'Компьютер', meta: color + ' · ' + lvl };
+    }
+    if (opts.mode === 'ai') {
+      var u = NardyAccount.user();
+      return { name: (u && u.name) || NardyNet.name() || 'Вы', meta: color };
+    }
+    return { name: p === 'w' ? 'Белые' : 'Чёрные', meta: 'игрок' };
+  }
+
+  /* Часы хода: «ходит · 0:42» и кольцо вокруг аватарки того, чей ход */
+  var RING = 2 * Math.PI * 24;
+  function paintClock() {
+    var ms = clockLeft(), full = NardyTable.LIMITS.move;
+    ['w', 'b'].forEach(function (p) {
+      var on = ms >= 0 && S && !S.winner && S.turn === p;
+      $('pl-' + p).classList.toggle('clocked', on);
+      $('pl-' + p).classList.toggle('hurry', on && ms <= 10000);
+      $('turn-' + p).textContent = on ? 'ходит · ' + clockText(ms) : 'ходит';
+      if (on) {
+        var frac = Math.max(0, Math.min(1, ms / full));
+        $('ring-' + p).style.strokeDasharray = (frac * RING).toFixed(1) + ' ' + RING.toFixed(1);
+      }
+    });
   }
 
   /* Аватарка: фото из Telegram у людей, резная шашка у компьютера */
@@ -782,17 +819,6 @@
 
   /* ---------- игра по сети ---------- */
 
-  /* Подпись под именем (идёт в textContent — экранировать не нужно) */
-  function seatLabel(p) {
-    var who = net.table && net.table.seats ? net.table.seats[p] : null;
-    if (!who) return 'место свободно';
-    var ms = clockLeft();
-    var clock = ms >= 0 && S.turn === p ? ' · ' + clockText(ms) : '';
-    if (who.id === NardyNet.id()) return (who.name || 'Игрок') + ' · вы' + clock;
-    var tag = NardyNet.hasRoom() ? (oppOnline(p) ? ' · в сети' : ' · не в сети') : '';
-    return (who.name || 'Игрок') + (clock || tag);
-  }
-
   function oppOnline(p) {
     var t = net.table;
     if (t && t.seen) return !!t.seen[p] && t.now - t.seen[p] < 45000;
@@ -1042,7 +1068,7 @@
   setInterval(function () {
     var ms = clockLeft();
     if (ms < 0) return;
-    $('meta-' + S.turn).textContent = seatLabel(S.turn);
+    paintClock();
     if (S.turn === net.seat && ms <= 10000 && ms > 0 && net.warned !== net.turnKey) {
       net.warned = net.turnKey;
       NardyTG.buzz('lose');
