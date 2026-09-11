@@ -24,7 +24,7 @@
   var drag = null;
   var hinted = null;
 
-  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, banter: 'hard', timer: 'off', match: '0' };
+  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, amb: true, banter: 'hard', timer: 'off', match: '0' };
   try {
     var prefs = JSON.parse(localStorage.getItem('nardy.opts') || 'null');
     if (prefs) { for (var k in prefs) if (opts[k] !== undefined) opts[k] = prefs[k]; }
@@ -125,60 +125,11 @@
 
   /* ---------- звук ---------- */
 
-  var actx = null;
-  function ac() {
-    if (!actx) {
-      var A = window.AudioContext || window.webkitAudioContext;
-      if (!A) return null;
-      actx = new A();
-    }
-    if (actx.state === 'suspended') actx.resume();
-    return actx;
-  }
-
-  function noise(dur, freq, q, gain, delay) {
-    var c = ac(); if (!c) return;
-    var t = c.currentTime + (delay || 0);
-    var len = Math.max(1, Math.ceil(c.sampleRate * dur));
-    var buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0), i;
-    for (i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
-    var src = c.createBufferSource(); src.buffer = buf;
-    var f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
-    var g = c.createGain(); g.gain.value = gain;
-    src.connect(f); f.connect(g); g.connect(c.destination);
-    src.start(t);
-  }
-
-  function tone(freq, dur, gain, delay, type) {
-    var c = ac(); if (!c) return;
-    var t = c.currentTime + (delay || 0);
-    var o = c.createOscillator(); o.type = type || 'triangle';
-    o.frequency.setValueAtTime(freq, t);
-    var g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(c.destination);
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-
+  /* Стук — кости и шашки, фон — гул чайханы (js/sound.js).
+     Вибрация идёт всегда: она не мешает соседям. */
   function sfx(kind) {
     NardyTG.buzz(kind);
-    if (!opts.sound) return;
-    try {
-      if (kind === 'move') { noise(0.05, 2400, 1.2, 0.16); tone(220, 0.07, 0.05, 0, 'square'); }
-      else if (kind === 'dice') {
-        noise(0.07, 1500, 0.8, 0.13, 0);
-        noise(0.06, 2100, 1.0, 0.11, 0.09);
-        noise(0.09, 1200, 0.7, 0.15, 0.19);
-      }
-      else if (kind === 'off') { tone(880, 0.16, 0.07, 0); tone(1320, 0.2, 0.05, 0.05); }
-      else if (kind === 'win') {
-        [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.5, 0.07, i * 0.11, 'triangle'); });
-      }
-      else if (kind === 'no') { tone(150, 0.16, 0.06, 0, 'sawtooth'); }
-      else if (kind === 'tick') { noise(0.035, 1900, 1.4, 0.10); }
-    } catch (e) {}
+    if (opts.sound) NardySound.play(kind);
   }
 
   /* ---------- построение доски ---------- */
@@ -351,7 +302,6 @@
   /* ---------- кости ---------- */
 
   var diceKey = '';
-  var lastTick = 0;
 
   /* Кости живут на своём холсте: бросок считается физикой */
   function renderDice(animate) {
@@ -375,14 +325,9 @@
     NardyDice.show(used);
   }
 
-  /* стук кости о доску — но не чаще, чем ухо разбирает.
+  /* стук кости о доску на каждом отскоке.
      Имя не tick: так называется счётчик отложенных действий. */
-  function diceTick() {
-    var now = Date.now();
-    if (now - lastTick < 55) return;
-    lastTick = now;
-    sfx('tick');
-  }
+  function diceTick() { if (opts.sound) NardySound.play('tick'); }
 
   /* жеребьёвка: по кости каждому, летят с обеих сторон */
   function renderOpeningDice(a, b) {
@@ -458,8 +403,11 @@
     setSides();
     setAvatars();
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
-    $('act-sound').textContent = opts.sound ? '♪' : '✕';
-    $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
+    $('act-sound').classList.toggle('off', !opts.sound);
+    $('act-sound').title = opts.sound ? 'Выключить стук' : 'Включить стук';
+    $('act-amb').setAttribute('aria-pressed', String(opts.amb));
+    $('act-amb').classList.toggle('off', !opts.amb);
+    $('act-amb').title = opts.amb ? 'Выключить гул чайханы' : 'Включить гул чайханы';
   }
 
   /* Что написано на табличке игрока: имя крупно, под ним цвет и состояние */
@@ -2086,6 +2034,18 @@
     save();
     if (opts.sound) sfx('move');
     updateUI();
+  });
+  $('act-amb').addEventListener('click', function () {
+    opts.amb = !opts.amb;
+    save();
+    NardySound.ambience(opts.amb);
+    NardySound.unlock();
+    updateUI();
+  });
+  /* браузер даёт звук только после касания — с первым же касанием и заводим фон */
+  NardySound.ambience(opts.amb);
+  ['pointerdown', 'touchend', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, function () { NardySound.unlock(); }, { passive: true });
   });
 
   veil.addEventListener('click', function (e) {

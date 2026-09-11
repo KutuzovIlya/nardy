@@ -118,7 +118,7 @@ button { font: inherit; color: inherit; }
 .bar {
   flex: none;
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1.5fr 1fr;
+  grid-template-columns: 1.3fr 1fr 1.5fr 1fr 1fr;
   gap: 6px;
 }
 
@@ -129,7 +129,10 @@ button { font: inherit; color: inherit; }
   font-size: 13px;
 }
 
-.bar #act-undo, .bar #act-sound { font-size: 18px; line-height: 1; }
+.bar #act-undo, .bar #act-sound, .bar #act-amb { font-size: 18px; line-height: 1; }
+
+/* выключенный звук — тусклый и перечёркнутый */
+.bar .btn.off { color: var(--text-dim); text-decoration: line-through; text-decoration-thickness: 2px; }
 
 .score {
   display: grid;
@@ -906,7 +909,8 @@ button { font: inherit; color: inherit; }
       <b class="mono"><span id="tally-a">0</span> : <span id="tally-z">0</span></b>
       <span id="score-sub">счёт</span>
     </div>
-    <button class="btn" id="act-sound" type="button" aria-pressed="true" title="Звук">♪</button>
+    <button class="btn" id="act-sound" type="button" aria-pressed="true" title="Стук" aria-label="Стук костей и шашек">♪</button>
+    <button class="btn" id="act-amb" type="button" aria-pressed="true" title="Фон" aria-label="Гул чайханы">≋</button>
   </nav>
 
 </div>
@@ -4022,6 +4026,274 @@ button { font: inherit; color: inherit; }
 </script>
 <script>
 /* ============================================================
+   Звук. Всё синтезируется на месте, записей не скачиваем.
+
+   Стук: дерево о дерево — несколько затухающих тонов корпуса
+   и короткий щелчок в начале. Кость о доску — суше и выше,
+   шашка на пункт — глухое «тук».
+
+   Фон: чайхана. Гул голосов вдалеке (шум, пропущенный через
+   «гласные» фильтры, с неровным ритмом речи), звон стаканов,
+   кости за соседним столом.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  var ctx = null, fx = null, amb = null, far = null, buf = null;
+
+  function ac() {
+    if (!ctx) {
+      var A = global.AudioContext || global.webkitAudioContext;
+      if (!A) return null;
+      ctx = new A();
+      fx = ctx.createGain();
+      fx.gain.value = 1;
+      fx.connect(ctx.destination);
+      amb = ctx.createGain();
+      amb.gain.value = 0;
+      amb.connect(ctx.destination);
+      /* всё, что «за соседним столом», слышно глуше */
+      far = ctx.createBiquadFilter();
+      far.type = 'lowpass';
+      far.frequency.value = 1800;
+      far.connect(amb);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function noise() {
+    if (buf) return buf;
+    var len = ctx.sampleRate * 2, d, i;
+    buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    d = buf.getChannelData(0);
+    for (i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  /* Удар дерева: base — основной тон корпуса, gain — громкость,
+     decay — сколько звенит, click — где «щёлкает» начало. */
+  var RATIOS = [1, 2.32, 4.25, 6.8], AMPS = [1, .55, .3, .15];
+  function knock(t, base, gain, decay, click, out) {
+    out = out || fx;
+    for (var i = 0; i < RATIOS.length; i++) {
+      var f = base * RATIOS[i] * rnd(.98, 1.02);
+      if (f > 9000) continue;
+      var o = ctx.createOscillator(), g = ctx.createGain(), d = decay / (1 + i * .9);
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain * AMPS[i], t + .002);
+      g.gain.exponentialRampToValueAtTime(.0001, t + d);
+      o.connect(g);
+      g.connect(out);
+      o.start(t);
+      o.stop(t + d + .02);
+    }
+    var n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
+    n.buffer = noise();
+    bp.type = 'bandpass';
+    bp.frequency.value = click;
+    bp.Q.value = .9;
+    ng.gain.setValueAtTime(gain * .7, t);
+    ng.gain.exponentialRampToValueAtTime(.0001, t + .018);
+    n.connect(bp);
+    bp.connect(ng);
+    ng.connect(out);
+    n.start(t, rnd(0, 1.5));
+    n.stop(t + .03);
+  }
+
+  /* Стеклянный стакан: высокие чистые тоны, звенят дольше дерева */
+  function clink(t, pitch, gain, out) {
+    [1, 1.62, 2.26].forEach(function (r, i) {
+      var o = ctx.createOscillator(), g = ctx.createGain(), d = [.7, .45, .3][i];
+      o.type = 'sine';
+      o.frequency.value = pitch * r * rnd(.995, 1.005);
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain / (1 + i), t + .003);
+      g.gain.exponentialRampToValueAtTime(.0001, t + d);
+      o.connect(g);
+      g.connect(out);
+      o.start(t);
+      o.stop(t + d + .02);
+    });
+  }
+
+  function tone(t, freq, dur, gain, type) {
+    var o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    o.type = type || 'triangle';
+    o.frequency.value = freq;
+    lp.type = 'lowpass';
+    lp.frequency.value = 2600;
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + .015);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(lp);
+    lp.connect(g);
+    g.connect(fx);
+    o.start(t);
+    o.stop(t + dur + .05);
+  }
+
+  /* ---------- стук ---------- */
+
+  var last = 0;
+
+  function play(kind) {
+    if (!ac()) return;
+    var t = ctx.currentTime + .005, i;
+    try {
+      if (kind === 'tick') {
+        /* отскок кости: не чаще, чем ухо различает */
+        if (t - last < .05) return;
+        last = t;
+        knock(t, rnd(900, 1300), rnd(.06, .11), .06, 3400);
+      } else if (kind === 'dice') {
+        /* кости в руке: несколько сухих щелчков друг о друга */
+        for (i = 0; i < 5; i++) knock(t + i * rnd(.03, .055), rnd(1900, 2700), .045, .03, 4200);
+      } else if (kind === 'move') {
+        knock(t, rnd(250, 310), .2, .13, 1800);
+        knock(t + .028, rnd(300, 360), .06, .07, 2200);          /* шашка чуть подпрыгнула */
+      } else if (kind === 'off') {
+        knock(t, rnd(400, 440), .15, .1, 2400);
+        clink(t + .05, 1760, .025, fx);
+      } else if (kind === 'no') {
+        knock(t, 140, .2, .09, 900);
+      } else if (kind === 'win') {
+        [523, 659, 784, 1047].forEach(function (f, k) { tone(t + k * .11, f, .55, .07); });
+      } else if (kind === 'lose') {
+        tone(t, 392, .5, .06);
+        tone(t + .18, 311, .7, .06);
+      }
+    } catch (e) {}
+  }
+
+  /* ---------- фон: чайхана ---------- */
+
+  var on = false, want = false, loops = [], voices = [], timer = null, nextClink = 0, nextRattle = 0;
+
+  var VOWELS = [
+    { f: 290, q: 2.4, w: 1 },
+    { f: 520, q: 2.2, w: 1 },
+    { f: 860, q: 2.0, w: .7 },
+    { f: 1400, q: 2.6, w: .45 }
+  ];
+
+  function start() {
+    if (on || !ac()) return;
+    on = true;
+    var t = ctx.currentTime;
+
+    /* гул помещения */
+    var room = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), rg = ctx.createGain();
+    room.buffer = noise();
+    room.loop = true;
+    lp.type = 'lowpass';
+    lp.frequency.value = 240;
+    rg.gain.value = .25;
+    room.connect(lp);
+    lp.connect(rg);
+    rg.connect(amb);
+    room.start(t, rnd(0, 2));
+    loops.push(room);
+
+    /* голоса: у каждого свой «гласный» фильтр и свой неровный ритм */
+    voices = VOWELS.map(function (v) {
+      var s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noise();
+      s.loop = true;
+      bp.type = 'bandpass';
+      bp.frequency.value = v.f;
+      bp.Q.value = v.q;
+      g.gain.value = 0;
+      s.connect(bp);
+      bp.connect(g);
+      g.connect(amb);
+      s.start(t, rnd(0, 2));
+      loops.push(s);
+      return { g: g, bp: bp, v: v, at: 0 };
+    });
+
+    nextClink = t + rnd(3, 7);
+    nextRattle = t + rnd(8, 16);
+    timer = setInterval(tickAmb, 60);
+
+    amb.gain.cancelScheduledValues(t);
+    amb.gain.setValueAtTime(amb.gain.value, t);
+    amb.gain.linearRampToValueAtTime(.6, t + 2.5);            /* входим в чайхану, а не врубаем */
+  }
+
+  function tickAmb() {
+    if (!on) return;
+    var t = ctx.currentTime;
+    voices.forEach(function (x, i) {
+      if (t < x.at) return;
+      /* речь — это слоги и паузы: то громче, то тише, иногда тишина */
+      /* узкая полоса шума тихая сама по себе — отсюда такие множители */
+      var lvl = Math.random() < .22 ? 0 : rnd(.15, .5) * x.v.w;
+      x.g.gain.setTargetAtTime(lvl, t, rnd(.04, .1));
+      x.bp.frequency.setTargetAtTime(x.v.f * rnd(.85, 1.2), t, .08);
+      x.at = t + rnd(.09, .26);
+    });
+    if (t >= nextClink) {
+      /* стаканы: иногда один, иногда чокаются двое */
+      var p = rnd(2400, 3100);
+      clink(t, p, rnd(.02, .04), amb);
+      if (Math.random() < .4) clink(t + rnd(.06, .12), p * rnd(1.05, 1.15), rnd(.015, .03), amb);
+      nextClink = t + rnd(4, 13);
+    }
+    if (t >= nextRattle) {
+      /* за соседним столом бросили кости */
+      var n = 3 + Math.floor(Math.random() * 4);
+      for (var k = 0; k < n; k++) knock(t + k * rnd(.05, .14), rnd(900, 1500), rnd(.02, .04), .05, 3000, far);
+      nextRattle = t + rnd(12, 30);
+    }
+  }
+
+  function stop() {
+    if (!on) return;
+    on = false;
+    clearInterval(timer);
+    timer = null;
+    var t = ctx.currentTime;
+    amb.gain.cancelScheduledValues(t);
+    amb.gain.setValueAtTime(amb.gain.value, t);
+    amb.gain.linearRampToValueAtTime(0, t + .6);
+    var old = loops;
+    loops = [];
+    voices = [];
+    setTimeout(function () { old.forEach(function (s) { try { s.stop(); } catch (e) {} }); }, 700);
+  }
+
+  /* Фон включается только после первого касания — раньше браузер звук не даст */
+  function ambience(flag) {
+    want = !!flag;
+    if (!ctx) return;                    /* ещё не было касания — включим при нём */
+    if (want && !document.hidden) start(); else stop();
+  }
+
+  function unlock() {
+    if (!ac()) return;
+    if (want && !document.hidden) start();
+  }
+
+  /* свернули Telegram — чайхана замолкает, вернулись — снова шумит */
+  document.addEventListener('visibilitychange', function () {
+    if (!ctx) return;
+    if (document.hidden) { stop(); ctx.suspend && ctx.suspend(); }
+    else { ctx.resume && ctx.resume(); if (want) start(); }
+  });
+
+  function state() { return { ctx: ctx ? ctx.state : 'none', amb: on, want: want }; }
+
+  global.NardySound = { play: play, ambience: ambience, unlock: unlock, state: state };
+})(window);
+</script>
+<script>
+/* ============================================================
    Сетевой стол. Главный путь — Firebase (js/fb.js): стол лежит
    в базе Google, партию ведут сами телефоны по общим правилам
    js/table.js. Если когда-нибудь появится свой сервер (адрес
@@ -4607,7 +4879,7 @@ button { font: inherit; color: inherit; }
   var drag = null;
   var hinted = null;
 
-  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, banter: 'hard', timer: 'off', match: '0' };
+  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, amb: true, banter: 'hard', timer: 'off', match: '0' };
   try {
     var prefs = JSON.parse(localStorage.getItem('nardy.opts') || 'null');
     if (prefs) { for (var k in prefs) if (opts[k] !== undefined) opts[k] = prefs[k]; }
@@ -4708,60 +4980,11 @@ button { font: inherit; color: inherit; }
 
   /* ---------- звук ---------- */
 
-  var actx = null;
-  function ac() {
-    if (!actx) {
-      var A = window.AudioContext || window.webkitAudioContext;
-      if (!A) return null;
-      actx = new A();
-    }
-    if (actx.state === 'suspended') actx.resume();
-    return actx;
-  }
-
-  function noise(dur, freq, q, gain, delay) {
-    var c = ac(); if (!c) return;
-    var t = c.currentTime + (delay || 0);
-    var len = Math.max(1, Math.ceil(c.sampleRate * dur));
-    var buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0), i;
-    for (i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
-    var src = c.createBufferSource(); src.buffer = buf;
-    var f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
-    var g = c.createGain(); g.gain.value = gain;
-    src.connect(f); f.connect(g); g.connect(c.destination);
-    src.start(t);
-  }
-
-  function tone(freq, dur, gain, delay, type) {
-    var c = ac(); if (!c) return;
-    var t = c.currentTime + (delay || 0);
-    var o = c.createOscillator(); o.type = type || 'triangle';
-    o.frequency.setValueAtTime(freq, t);
-    var g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(c.destination);
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-
+  /* Стук — кости и шашки, фон — гул чайханы (js/sound.js).
+     Вибрация идёт всегда: она не мешает соседям. */
   function sfx(kind) {
     NardyTG.buzz(kind);
-    if (!opts.sound) return;
-    try {
-      if (kind === 'move') { noise(0.05, 2400, 1.2, 0.16); tone(220, 0.07, 0.05, 0, 'square'); }
-      else if (kind === 'dice') {
-        noise(0.07, 1500, 0.8, 0.13, 0);
-        noise(0.06, 2100, 1.0, 0.11, 0.09);
-        noise(0.09, 1200, 0.7, 0.15, 0.19);
-      }
-      else if (kind === 'off') { tone(880, 0.16, 0.07, 0); tone(1320, 0.2, 0.05, 0.05); }
-      else if (kind === 'win') {
-        [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.5, 0.07, i * 0.11, 'triangle'); });
-      }
-      else if (kind === 'no') { tone(150, 0.16, 0.06, 0, 'sawtooth'); }
-      else if (kind === 'tick') { noise(0.035, 1900, 1.4, 0.10); }
-    } catch (e) {}
+    if (opts.sound) NardySound.play(kind);
   }
 
   /* ---------- построение доски ---------- */
@@ -4934,7 +5157,6 @@ button { font: inherit; color: inherit; }
   /* ---------- кости ---------- */
 
   var diceKey = '';
-  var lastTick = 0;
 
   /* Кости живут на своём холсте: бросок считается физикой */
   function renderDice(animate) {
@@ -4958,14 +5180,9 @@ button { font: inherit; color: inherit; }
     NardyDice.show(used);
   }
 
-  /* стук кости о доску — но не чаще, чем ухо разбирает.
+  /* стук кости о доску на каждом отскоке.
      Имя не tick: так называется счётчик отложенных действий. */
-  function diceTick() {
-    var now = Date.now();
-    if (now - lastTick < 55) return;
-    lastTick = now;
-    sfx('tick');
-  }
+  function diceTick() { if (opts.sound) NardySound.play('tick'); }
 
   /* жеребьёвка: по кости каждому, летят с обеих сторон */
   function renderOpeningDice(a, b) {
@@ -5041,8 +5258,11 @@ button { font: inherit; color: inherit; }
     setSides();
     setAvatars();
     $('act-sound').setAttribute('aria-pressed', String(opts.sound));
-    $('act-sound').textContent = opts.sound ? '♪' : '✕';
-    $('act-sound').title = opts.sound ? 'Выключить звук' : 'Включить звук';
+    $('act-sound').classList.toggle('off', !opts.sound);
+    $('act-sound').title = opts.sound ? 'Выключить стук' : 'Включить стук';
+    $('act-amb').setAttribute('aria-pressed', String(opts.amb));
+    $('act-amb').classList.toggle('off', !opts.amb);
+    $('act-amb').title = opts.amb ? 'Выключить гул чайханы' : 'Включить гул чайханы';
   }
 
   /* Что написано на табличке игрока: имя крупно, под ним цвет и состояние */
@@ -6669,6 +6889,18 @@ button { font: inherit; color: inherit; }
     save();
     if (opts.sound) sfx('move');
     updateUI();
+  });
+  $('act-amb').addEventListener('click', function () {
+    opts.amb = !opts.amb;
+    save();
+    NardySound.ambience(opts.amb);
+    NardySound.unlock();
+    updateUI();
+  });
+  /* браузер даёт звук только после касания — с первым же касанием и заводим фон */
+  NardySound.ambience(opts.amb);
+  ['pointerdown', 'touchend', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, function () { NardySound.unlock(); }, { passive: true });
   });
 
   veil.addEventListener('click', function (e) {

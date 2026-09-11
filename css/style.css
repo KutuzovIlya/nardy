@@ -111,7 +111,7 @@ button { font: inherit; color: inherit; }
 .bar {
   flex: none;
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1.5fr 1fr;
+  grid-template-columns: 1.3fr 1fr 1.5fr 1fr 1fr;
   gap: 6px;
 }
 
@@ -122,7 +122,10 @@ button { font: inherit; color: inherit; }
   font-size: 13px;
 }
 
-.bar #act-undo, .bar #act-sound { font-size: 18px; line-height: 1; }
+.bar #act-undo, .bar #act-sound, .bar #act-amb { font-size: 18px; line-height: 1; }
+
+/* выключенный звук — тусклый и перечёркнутый */
+.bar .btn.off { color: var(--text-dim); text-decoration: line-through; text-decoration-thickness: 2px; }
 
 .score {
   display: grid;
