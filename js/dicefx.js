@@ -12,6 +12,13 @@
   var cur = null;          /* {side, vals, spots:[{x,y,a}], used:[]} */
   var raf = 0, live = null;
 
+  /* Сменилось оформление — картинки граней рисуем заново */
+  function restyle() {
+    ready = false;
+    preload();
+    setTimeout(draw, 60);                 /* картинки из data: грузятся не мгновенно */
+  }
+
   function preload() {
     if (ready) return;
     ready = true;
@@ -264,7 +271,7 @@
     }
   }
 
-  global.NardyDice = {
+  global.NardyDice = { restyle: restyle,
     attach: attach, resize: resize, place: place, show: show,
     roll: roll, clear: clear, draw: draw,
     rolling: function () { return !!live; }

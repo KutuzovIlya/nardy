@@ -22,7 +22,10 @@
   var tally = { w: 0, b: 0 };
   var drag = null;
 
-  var opts = { mode: 'ai', level: 'normal', human: 'w', sound: true, amb: true, banter: 'hard', timer: 'off', match: '0' };
+  var opts = {
+    mode: 'ai', level: 'normal', human: 'w', sound: true, amb: true, banter: 'hard', timer: 'off', match: '0',
+    wood: 'walnut', men: 'turned', dice: 'ember'           /* оформление: борт, шашки, кости */
+  };
   try {
     var prefs = JSON.parse(localStorage.getItem('nardy.opts') || 'null');
     if (prefs) { for (var k in prefs) if (opts[k] !== undefined) opts[k] = prefs[k]; }
@@ -157,6 +160,22 @@
       box(e, B.trayBox(p));
       lZones.appendChild(e);
     });
+  }
+
+  /* Сменить оформление на лету: доска, шашки, кости, кружки на табличках */
+  function applyStyle() {
+    B.setStyle({ wood: opts.wood, men: opts.men, dice: opts.dice });
+    B.render(scene);
+    Array.prototype.forEach.call(document.querySelectorAll('.man'), function (e) {
+      var p = e.classList.contains('w') ? 'w' : 'b';
+      e.style.backgroundImage = 'url(' + B.checker(p, 176) + ')';
+    });
+    ['w', 'b'].forEach(function (p) {
+      Array.prototype.forEach.call(document.querySelectorAll('.disc.' + p), function (d) {
+        d.style.backgroundImage = 'url(' + B.checker(p, 96) + ')';
+      });
+    });
+    NardyDice.restyle();
   }
 
   function buildMen() {
@@ -1652,6 +1671,12 @@
       '<div class="field"><label>Комментатор</label>' +
       segHTML('banter', [['hard', 'Как за столом'], ['soft', 'Прилично'], ['off', 'Тихо']], opts.banter) +
       '</div>' +
+      '<div class="field"><label>Борт</label>' +
+      segHTML('wood', [['walnut', 'Орех'], ['ebony', 'Эбен'], ['oak', 'Дуб']], opts.wood) + '</div>' +
+      '<div class="field"><label>Шашки</label>' +
+      segHTML('men', [['turned', 'Точёные'], ['inlay', 'С латунью'], ['stone', 'Камень']], opts.men) + '</div>' +
+      '<div class="field"><label>Кости</label>' +
+      segHTML('dice', [['ember', 'Угли'], ['bone', 'Кость'], ['brass', 'Латунь']], opts.dice) + '</div>' +
       (S && !S.winner ? '<p class="hint">Партия идёт. Начнёте новую — счёт матча ' +
         tally.w + ' : ' + tally.b + ' сохранится.</p>' : '') +
       '<div class="sheet-actions">' +
@@ -2005,6 +2030,7 @@
       });
       save();
       if (seg.dataset.k === 'mode' && opts.mode === 'net') { netSheet(); return; }
+      if (/^(wood|men|dice)$/.test(seg.dataset.k)) { applyStyle(); return; }
       syncSetup();
       return;
     }
@@ -2089,6 +2115,7 @@
   };
 
   NardyTG.ready();
+  B.setStyle({ wood: opts.wood, men: opts.men, dice: opts.dice });
   if (!NardyNet.name() && NardyTG.userName()) NardyNet.rename(NardyTG.userName());
   ['w', 'b'].forEach(function (p) {
     Array.prototype.forEach.call(document.querySelectorAll('.disc.' + p), function (d) {

@@ -29,13 +29,46 @@
   var TOPY = FRAME + SHELF;              /* верх верхнего ряда */
   var BOTY = VH - FRAME - SHELF;         /* низ нижнего ряда */
 
-  var C = {
-    frameHi: '#5E3A23', frameLo: '#1E110B',
-    bed: '#3E2517', bedLo: '#200F07',
-    bone: '#D9C39B', boneMid: '#C2A97E', boneLo: '#9C8256',
-    felt: '#1D5A53', feltMid: '#154742', feltLo: '#0E332F',
-    brass: '#C8A24A', dark: '#2B1710'
+  /* ---------- оформление ----------
+     Три борта, три набора шашек, три пары костей — выбирает игрок.
+     trim — поясок по борту, mark — знак в углах. */
+  var WOODS = {
+    walnut: {                              /* орех, ёлочка, воровские звёзды */
+      frameHi: '#5E3A23', frameMid: '#3B2114', frameLo: '#1E110B',
+      bed: '#3E2517', bedMid: '#361F12', bedLo: '#200F07',
+      barLo: '#150B05', barHi: '#4E2D1B', shelf: '#190D06',
+      bone: '#D9C39B', boneMid: '#C2A97E', boneLo: '#9C8256',
+      felt: '#1D5A53', feltMid: '#154742', feltLo: '#0E332F',
+      trim: 'chevrons', mark: 'star'
+    },
+    ebony: {                               /* эбен, латунная инкрустация, бордо */
+      frameHi: '#2E2622', frameMid: '#17120F', frameLo: '#070605',
+      bed: '#231B17', bedMid: '#18120F', bedLo: '#0A0806',
+      barLo: '#060504', barHi: '#2A221D', shelf: '#0B0807',
+      bone: '#E2CFA6', boneMid: '#CDB688', boneLo: '#A68C5C',
+      felt: '#6B1F26', feltMid: '#55171D', feltLo: '#360E12',
+      trim: 'inlay', mark: 'stud'
+    },
+    oak: {                                 /* светлый дуб, витой канат, тёмные клинья */
+      frameHi: '#A87842', frameMid: '#7A5228', frameLo: '#4A2F15',
+      bed: '#6E4827', bedMid: '#5E3C1F', bedLo: '#3C2511',
+      barLo: '#3A2410', barHi: '#8A5E30', shelf: '#2A1A0C',
+      bone: '#F0E2C2', boneMid: '#DCC79C', boneLo: '#B89C68',
+      felt: '#3A2416', feltMid: '#2C1B10', feltLo: '#1A0F08',
+      trim: 'rope', mark: 'star'
+    }
   };
+  var STYLE = { wood: 'walnut', men: 'turned', dice: 'ember' };
+  var C = WOODS.walnut;
+
+  /* Сменить оформление: картинки шашек и костей рисуются заново */
+  function setStyle(st) {
+    if (st.wood && WOODS[st.wood]) STYLE.wood = st.wood;
+    if (st.men && /^(turned|inlay|stone)$/.test(st.men)) STYLE.men = st.men;
+    if (st.dice && /^(ember|bone|brass)$/.test(st.dice)) STYLE.dice = st.dice;
+    C = WOODS[STYLE.wood];
+    cache = {};
+  }
 
   function vw() { return VW; }
   function vh() { return VH; }
@@ -285,12 +318,70 @@
     }
   }
 
+  /* Латунная инкрустация: тонкая полоса с тёмной окантовкой и заклёпки */
+  function inlay(ctx, x0, y0, x1, y1) {
+    var len = Math.hypot(x1 - x0, y1 - y0), ang = Math.atan2(y1 - y0, x1 - x0), t;
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.rotate(ang);
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(0, -2.6, len, 5.2);
+    var g = ctx.createLinearGradient(0, -1.6, 0, 1.6);
+    g.addColorStop(0, '#F1D98F'); g.addColorStop(.5, '#C8A24A'); g.addColorStop(1, '#7A5A1E');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, -1.6, len, 3.2);
+    for (t = 24; t < len - 12; t += 48) stud(ctx, t, 0, 3.4);
+    ctx.restore();
+  }
+
+  function stud(ctx, x, y, r) {
+    var g = ctx.createRadialGradient(x - r * .35, y - r * .35, r * .1, x, y, r);
+    g.addColorStop(0, '#FFF0C0'); g.addColorStop(.5, '#D9B560'); g.addColorStop(1, '#6F5418');
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 6.284);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.55)';
+    ctx.lineWidth = .8;
+    ctx.stroke();
+  }
+
+  /* Витой канат: частые косые насечки — будто верёвка вдоль борта */
+  function rope(ctx, x0, y0, x1, y1) {
+    var len = Math.hypot(x1 - x0, y1 - y0), ang = Math.atan2(y1 - y0, x1 - x0), t;
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.rotate(ang);
+    for (t = 0; t < len; t += 6) {
+      (function (tt) {
+        cut(ctx, function (c) {
+          c.beginPath();
+          c.moveTo(tt - 2.5, -4.5);
+          c.quadraticCurveTo(tt + 1.5, 0, tt + 2.5, 4.5);
+          c.stroke();
+        }, 0.7, 0.30);
+      })(t);
+    }
+    ctx.restore();
+  }
+
+  function trim(ctx, x0, y0, x1, y1) {
+    if (C.trim === 'inlay') inlay(ctx, x0, y0, x1, y1);
+    else if (C.trim === 'rope') rope(ctx, x0, y0, x1, y1);
+    else chevrons(ctx, x0, y0, x1, y1, 10);
+  }
+
+  function mark(ctx, x, y, r) {
+    if (C.mark === 'stud') stud(ctx, x, y, r * .7);
+    else thiefStar(ctx, x, y, r);
+  }
+
   /* ---------- части доски ---------- */
 
   function drawFrame(ctx) {
     var g = ctx.createLinearGradient(0, 0, VW * 0.6, VH);
     g.addColorStop(0, C.frameHi);
-    g.addColorStop(0.45, '#3B2114');
+    g.addColorStop(0.45, C.frameMid);
     g.addColorStop(1, C.frameLo);
     rrect(ctx, 0, 0, VW, VH, 16);
     ctx.fillStyle = g;
@@ -303,14 +394,14 @@
     rrect(ctx, 0, 0, VW, VH, 16);
     rrect(ctx, FRAME, FRAME, VW - 2 * FRAME, VH - 2 * FRAME, 5);
     ctx.clip('evenodd');
-    chevrons(ctx, 34, c, VW - 34, c, 10);
-    chevrons(ctx, VW - 34, VH - c, 34, VH - c, 10);
-    chevrons(ctx, c, VH - 34, c, 34, 10);
-    chevrons(ctx, VW - c, 34, VW - c, VH - 34, 10);
+    trim(ctx, 34, c, VW - 34, c);
+    trim(ctx, VW - 34, VH - c, 34, VH - c);
+    trim(ctx, c, VH - 34, c, 34);
+    trim(ctx, VW - c, 34, VW - c, VH - 34);
     ctx.restore();
 
     [[c + 1, c + 1], [VW - c - 1, c + 1], [c + 1, VH - c - 1], [VW - c - 1, VH - c - 1]]
-      .forEach(function (p) { thiefStar(ctx, p[0], p[1], 8); });
+      .forEach(function (p) { mark(ctx, p[0], p[1], 8); });
 
     ctx.strokeStyle = 'rgba(200,162,74,.42)';
     ctx.lineWidth = 1.1;
@@ -322,7 +413,7 @@
     var x = FRAME, y = FRAME, w = VW - 2 * FRAME, h = VH - 2 * FRAME;
     var g = ctx.createLinearGradient(0, y, 0, y + h);
     g.addColorStop(0, C.bed);
-    g.addColorStop(0.5, '#361F12');
+    g.addColorStop(0.5, C.bedMid);
     g.addColorStop(1, C.bedLo);
     ctx.fillStyle = g;
     ctx.fillRect(x, y, w, h);
@@ -340,7 +431,7 @@
   function drawShelf(ctx, player) {
     var b = trayBox(player);
     rrect(ctx, b.x, b.y, b.w, b.h, 8);
-    ctx.fillStyle = '#190D06';
+    ctx.fillStyle = C.shelf;
     ctx.fill();
     ctx.save();
     ctx.clip();
@@ -352,21 +443,22 @@
     ctx.strokeStyle = 'rgba(200,162,74,.28)';
     ctx.lineWidth = 1;
     rrect(ctx, b.x, b.y, b.w, b.h, 8); ctx.stroke();
-    thiefStar(ctx, b.x + b.w / 2, b.y + b.h / 2, 26);
+    if (C.mark === 'stud') rosette(ctx, b.x + b.w / 2, b.y + b.h / 2, 26, 16);
+    else thiefStar(ctx, b.x + b.w / 2, b.y + b.h / 2, 26);
   }
 
   function drawBar(ctx) {
     var x = colX(6) - BAR, y = TOPY - 6, h = BOTY - TOPY + 12;
     var g = ctx.createLinearGradient(x, 0, x + BAR, 0);
-    g.addColorStop(0, '#150B05');
-    g.addColorStop(0.5, '#4E2D1B');
-    g.addColorStop(1, '#150B05');
+    g.addColorStop(0, C.barLo);
+    g.addColorStop(0.5, C.barHi);
+    g.addColorStop(1, C.barLo);
     rrect(ctx, x, y, BAR, h, 6);
     ctx.fillStyle = g; ctx.fill();
     ctx.save();
     ctx.clip();
     grain(ctx, x, y, BAR, h, 55, 30, 0.12);
-    chevrons(ctx, x + BAR / 2, y + 22, x + BAR / 2, y + h - 22, 10);
+    trim(ctx, x + BAR / 2, y + 22, x + BAR / 2, y + h - 22);
     ctx.restore();
     ctx.strokeStyle = 'rgba(200,162,74,.26)';
     ctx.lineWidth = 1;
@@ -501,13 +593,117 @@
     return cv.toDataURL('image/png');
   }
 
-  /* Точёная шашка: фаска, две канавки и резная звезда посередине */
   function checker(side, px) {
-    var key = 'man' + side + px;
+    var key = 'man' + STYLE.men + side + px;
     if (cache[key]) return cache[key];
-    cache[key] = face(px, function (ctx, s) {
+    var paint = STYLE.men === 'inlay' ? inlaidMan : STYLE.men === 'stone' ? stoneMan : turnedMan;
+    cache[key] = face(px, function (ctx, s) { paint(ctx, s, side === 'w'); });
+    return cache[key];
+  }
+
+  /* Гладкая шашка: полированная кость или эбен, латунный поясок и латунная
+     вставка посередине с гравированной звездой */
+  function inlaidMan(ctx, s, bone) {
+    var r = s / 2, i, a;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(r, r, r - 1, 0, 6.284); ctx.clip();
+    var g = ctx.createRadialGradient(r * .62, r * .55, r * .08, r, r, r);
+    if (bone) { g.addColorStop(0, '#FFFBF0'); g.addColorStop(.5, '#EFE0BE'); g.addColorStop(1, '#B89A68'); }
+    else { g.addColorStop(0, '#4A423C'); g.addColorStop(.5, '#1E1A17'); g.addColorStop(1, '#060505'); }
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    /* латунный поясок */
+    ctx.beginPath(); ctx.arc(r, r, r * .7, 0, 6.284);
+    ctx.lineWidth = s * .035;
+    ctx.strokeStyle = '#C8A24A';
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(r, r - s * .006, r * .7, 0, 6.284);
+    ctx.lineWidth = s * .012;
+    ctx.strokeStyle = 'rgba(255,240,190,.7)';
+    ctx.stroke();
+    /* вставка */
+    var b = ctx.createRadialGradient(r * .85, r * .8, 1, r, r, r * .36);
+    b.addColorStop(0, '#FFF0C0'); b.addColorStop(.55, '#D9B560'); b.addColorStop(1, '#8A6A24');
+    ctx.beginPath(); ctx.arc(r, r, r * .36, 0, 6.284);
+    ctx.fillStyle = b;
+    ctx.fill();
+    ctx.save();
+    ctx.translate(r, r);
+    ctx.strokeStyle = 'rgba(60,40,10,.7)';
+    ctx.lineWidth = s * .014;
+    for (i = 0; i < 8; i++) {
+      a = i * Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * .06, Math.sin(a) * r * .06);
+      ctx.lineTo(Math.cos(a) * r * .28, Math.sin(a) * r * .28);
+      ctx.stroke();
+    }
+    ctx.restore();
+    /* блик полировки */
+    var hi = ctx.createLinearGradient(0, 0, s * .6, s * .7);
+    hi.addColorStop(0, bone ? 'rgba(255,255,250,.6)' : 'rgba(255,245,225,.22)');
+    hi.addColorStop(.5, 'rgba(255,255,250,0)');
+    ctx.fillStyle = hi;
+    ctx.fillRect(0, 0, s, s);
+    var sh = ctx.createRadialGradient(r, r, r * .78, r, r, r);
+    sh.addColorStop(0, 'rgba(0,0,0,0)');
+    sh.addColorStop(1, bone ? 'rgba(70,48,18,.45)' : 'rgba(0,0,0,.7)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(0, 0, s, s);
+    ctx.restore();
+  }
+
+  /* Каменная шашка: белый мрамор с прожилками или чёрный гранит с крапом,
+     скошенный край */
+  function stoneMan(ctx, s, white) {
+    var r = s / 2, i, gr = rnd32(white ? 77 : 91);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(r, r, r - 1, 0, 6.284); ctx.clip();
+    var g = ctx.createRadialGradient(r * .7, r * .62, r * .1, r, r, r);
+    if (white) { g.addColorStop(0, '#FFFFFB'); g.addColorStop(.6, '#E6E1D8'); g.addColorStop(1, '#A8A196'); }
+    else { g.addColorStop(0, '#4A4B50'); g.addColorStop(.6, '#232427'); g.addColorStop(1, '#0B0B0C'); }
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    if (white) {
+      /* прожилки мрамора */
+      for (i = 0; i < 7; i++) {
+        ctx.beginPath();
+        var y0 = gr() * s, y1 = gr() * s;
+        ctx.moveTo(0, y0);
+        ctx.bezierCurveTo(s * .3, y0 + (gr() - .5) * s * .5, s * .7, y1 + (gr() - .5) * s * .5, s, y1);
+        ctx.strokeStyle = 'rgba(110,105,100,' + (.12 + gr() * .2).toFixed(2) + ')';
+        ctx.lineWidth = s * (.004 + gr() * .012);
+        ctx.stroke();
+      }
+    } else {
+      /* крап гранита */
+      for (i = 0; i < s * 2.2; i++) {
+        ctx.beginPath();
+        ctx.arc(gr() * s, gr() * s, s * (.004 + gr() * .012), 0, 6.284);
+        ctx.fillStyle = gr() > .55 ? 'rgba(210,210,215,' + (.1 + gr() * .3).toFixed(2) + ')' : 'rgba(0,0,0,.45)';
+        ctx.fill();
+      }
+    }
+    /* скошенный край: светлая фаска сверху, тень снизу */
+    ctx.beginPath(); ctx.arc(r, r, r * .86, 0, 6.284);
+    ctx.lineWidth = s * .05;
+    var bev = ctx.createLinearGradient(0, 0, 0, s);
+    bev.addColorStop(0, white ? 'rgba(255,255,255,.7)' : 'rgba(200,200,210,.25)');
+    bev.addColorStop(1, 'rgba(0,0,0,.35)');
+    ctx.strokeStyle = bev;
+    ctx.stroke();
+    var hi = ctx.createLinearGradient(0, 0, s * .6, s * .7);
+    hi.addColorStop(0, white ? 'rgba(255,255,255,.45)' : 'rgba(230,235,245,.18)');
+    hi.addColorStop(.5, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hi;
+    ctx.fillRect(0, 0, s, s);
+    ctx.restore();
+  }
+
+  /* Точёная шашка: фаска, две канавки и резная звезда посередине */
+  function turnedMan(ctx, s, bone) {
+    (function (ctx, s) {
       var r = s / 2, i, a;
-      var bone = side === 'w';
       ctx.save();
       ctx.beginPath();
       ctx.arc(r, r, r - 1, 0, 6.284);
@@ -601,8 +797,7 @@
       ctx.fillStyle = hi;
       ctx.fillRect(0, 0, s, s);
       ctx.restore();
-    });
-    return cache[key];
+    })(ctx, s);
   }
 
   var PIPS = {
@@ -614,12 +809,93 @@
     6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]]
   };
 
+  function die(side, value, px) {
+    var key = 'die' + STYLE.dice + side + value + px;
+    if (cache[key]) return cache[key];
+    var paint = STYLE.dice === 'bone' ? boneDie : STYLE.dice === 'brass' ? brassDie : emberDie;
+    cache[key] = face(px, function (ctx, s) { paint(ctx, s, value); });
+    return cache[key];
+  }
+
+  /* Лунка точки: тёмное дно и светлый край снизу — будто высверлена */
+  function drill(ctx, cx, cy, rr, dark, rim) {
+    var g = ctx.createRadialGradient(cx - rr * .25, cy - rr * .3, rr * .1, cx, cy, rr);
+    g.addColorStop(0, dark[0]); g.addColorStop(.8, dark[1]); g.addColorStop(1, dark[2]);
+    ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 6.284);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, rr, .15 * Math.PI, .85 * Math.PI);
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = rr * .28;
+    ctx.stroke();
+  }
+
+  /* Кость: старая слоновая, чуть желтоватая, точки высверлены и затёрты чернью */
+  function boneDie(ctx, s, value) {
+    var i, gr = rnd32(value * 13 + 3);
+    ctx.save();
+    rrect(ctx, 1, 1, s - 2, s - 2, s * .17); ctx.clip();
+    var g = ctx.createLinearGradient(0, 0, s * .8, s);
+    g.addColorStop(0, '#FFF8E6'); g.addColorStop(.5, '#EEDDB8'); g.addColorStop(1, '#C8AE7E');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    for (i = 0; i < 14; i++) {
+      ctx.beginPath();
+      var y = gr() * s;
+      ctx.moveTo(0, y);
+      ctx.lineTo(s, y + (gr() - .5) * s * .2);
+      ctx.strokeStyle = 'rgba(150,120,70,' + (.05 + gr() * .08).toFixed(2) + ')';
+      ctx.lineWidth = s * (.004 + gr() * .01);
+      ctx.stroke();
+    }
+    PIPS[value].forEach(function (p) {
+      drill(ctx, p[0] / 100 * s, p[1] / 100 * s, s * .08, ['#3A2A18', '#140C06', '#2A1C0E'], 'rgba(255,245,220,.55)');
+    });
+    var hi = ctx.createLinearGradient(0, 0, s * .5, s * .55);
+    hi.addColorStop(0, 'rgba(255,255,250,.45)'); hi.addColorStop(.6, 'rgba(255,255,250,0)');
+    ctx.fillStyle = hi;
+    ctx.fillRect(0, 0, s, s);
+    ctx.strokeStyle = 'rgba(120,90,50,.35)';
+    ctx.lineWidth = s * .012;
+    rrect(ctx, 2, 2, s - 4, s - 4, s * .16); ctx.stroke();
+    ctx.restore();
+  }
+
+  /* Латунь: шлифованный металл, точки залиты чёрной эмалью */
+  function brassDie(ctx, s, value) {
+    var i, gr = rnd32(value * 7 + 11);
+    ctx.save();
+    rrect(ctx, 1, 1, s - 2, s - 2, s * .17); ctx.clip();
+    var g = ctx.createLinearGradient(0, 0, s, s);
+    g.addColorStop(0, '#F6E2A0'); g.addColorStop(.4, '#D2AE58'); g.addColorStop(.75, '#A8822E'); g.addColorStop(1, '#6F5418');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    for (i = 0; i < 40; i++) {
+      ctx.beginPath();
+      var y = gr() * s;
+      ctx.moveTo(0, y);
+      ctx.lineTo(s, y);
+      ctx.strokeStyle = gr() > .5 ? 'rgba(255,245,210,.10)' : 'rgba(80,55,10,.10)';
+      ctx.lineWidth = s * .006;
+      ctx.stroke();
+    }
+    PIPS[value].forEach(function (p) {
+      drill(ctx, p[0] / 100 * s, p[1] / 100 * s, s * .08, ['#2A2622', '#0A0908', '#1A1612'], 'rgba(255,240,190,.6)');
+    });
+    var hi = ctx.createLinearGradient(0, 0, s * .5, s * .55);
+    hi.addColorStop(0, 'rgba(255,250,230,.4)'); hi.addColorStop(.6, 'rgba(255,250,230,0)');
+    ctx.fillStyle = hi;
+    ctx.fillRect(0, 0, s, s);
+    ctx.strokeStyle = 'rgba(90,60,10,.5)';
+    ctx.lineWidth = s * .014;
+    rrect(ctx, 2, 2, s - 4, s - 4, s * .16); ctx.stroke();
+    ctx.restore();
+  }
+
   /* Чёрный камень со светящимися точками. Точка — не дырка, а огонёк:
      сначала ореол вокруг, потом тело, потом добела горячая середина. */
-  function die(side, value, px) {
-    var key = 'die' + side + value + px;
-    if (cache[key]) return cache[key];
-    cache[key] = face(px, function (ctx, s) {
+  function emberDie(ctx, s, value) {
+    (function (ctx, s) {
       var i, gr = rnd32(value * 17 + 5);
       ctx.save();
       rrect(ctx, 1, 1, s - 2, s - 2, s * 0.17);
@@ -686,13 +962,12 @@
       rrect(ctx, 2, 2, s - 4, s - 4, s * 0.16);
       ctx.stroke();
       ctx.restore();
-    });
-    return cache[key];
+    })(ctx, s);
   }
 
   global.NardyBoard = {
     VW: VW, VH: VH, CD: CD, DD: DD, COL: COL, PTH: PTH,
-    vw: vw, vh: vh, map: map, loadArt: loadArt,
+    vw: vw, vh: vh, map: map, loadArt: loadArt, setStyle: setStyle, style: function () { return STYLE; },
     geom: geom, manAt: manAt, trayAt: trayAt, trayBox: trayBox, diceAt: diceAt,
     gapFor: gapFor, render: render, checker: checker, die: die
   };

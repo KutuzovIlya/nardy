@@ -5,3 +5,4 @@ PLAN.html
 .mock/
 mock-layouts.html
 server/.store.json
+variants.html
